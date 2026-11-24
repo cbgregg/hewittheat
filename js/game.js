@@ -552,8 +552,9 @@ async function enableGoogleTiles(key){const msg=t=>{const e=document.getElementB
   const [T3,D3]=await Promise.all([import('../lib/tiles.js'),import('three/addons/loaders/DRACOLoader.js')]);
   const t=new T3.TilesRenderer();t.registerPlugin(new T3.GoogleCloudAuthPlugin({apiToken:key}));
   const dr=new D3.DRACOLoader();dr.setDecoderPath('lib/draco/');const gl=new GLTFLoader(t.manager);gl.setDRACOLoader(dr);t.manager.addHandler(/\.(gltf|glb)$/g,gl);
-  t.setLatLonToYUp(47.9900*PI/180,-122.2290*PI/180);t.setCamera(cam3);t.setResolutionFromRenderer(cam3,ren);t.errorTarget=LOW?24:12;
-  const R=new THREE.Group();R.rotation.y=PI/2;R.add(t.group);GTG=new THREE.Group();GTG.add(R);GTG.scale.set(9.9837,10,10.001);
+  t.setLatLonToYUp(47.9785*PI/180,-122.2045*PI/180);t.setCamera(cam3);t.setResolutionFromRenderer(cam3,ren);const ge=parseFloat(new URLSearchParams(location.search).get('ge'));t.errorTarget=isNaN(ge)?(LOW?12:6):ge;
+  t.addEventListener('load-model',e=>{e.scene.traverse(m=>{if(m.isMesh&&m.material&&!m.material.isMeshBasicMaterial){const o=m.material;m.material=new THREE.MeshBasicMaterial({map:o.map,toneMapped:false});o.dispose();}});});
+  const R=new THREE.Group();R.rotation.y=PI/2;R.add(t.group);GTG=new THREE.Group();GTG.add(R);GTG.scale.setScalar(10);GTG.position.set(WW/2,0,WH/2);
   const gz=parseFloat(new URLSearchParams(location.search).get('gz'));GTG.position.y=isNaN(gz)?220:gz;scene.add(GTG);
   let ok=false;t.addEventListener('load-tile-set',()=>{if(!ok){ok=true;for(const m of STATIC)m.visible=false;msg('Google 3D Tiles on');}});
   t.addEventListener('load-error',e=>{if(!ok)msg('Google tiles failed to load. Check the key, that Map Tiles API is enabled, and the referrer restriction.');});
@@ -690,5 +691,5 @@ function toggleMap(){const o=document.getElementById('mapov');if(document.getEle
   GV.forEach(gv=>dot(gv.x,gv.y,gv.type==='race'?'#ff5ad0':'#ffd23f',7));dot(SHOP.door.x,SHOP.door.y,'#ff8a30',6);dot(PAWN.curb.x,PAWN.curb.y,'#7ad06a',6);dot(HOSP.curb.x,HOSP.curb.y,'#ff5a6a',6);for(const p of PKG)if(!pkgGot[p.i])dot(p.x,p.y,'#40e0ff',4);if(M)dot(M.tx,M.ty,'#ffb300',9);dot(P.x,P.y,'#e02020',8);
   document.getElementById('pkc').textContent='Packages '+Object.keys(pkgGot).length+'/'+PKG.length;
   const w=document.getElementById('mapwrap');w.scrollLeft=P.x/WW*c.clientWidth-w.clientWidth/2;w.scrollTop=P.y/WH*c.clientHeight-w.clientHeight/2;}}
-window.G={boot,update,render,P,nextWeapon,makePed,get GV(){return GV;},nodes,get LM(){return LM;},get map(){return map;},Hat,get STOPS(){return STOPS;},get SPOTS(){return SPOTS;},makeCar,tileAt,get cars(){return cars;},get peds(){return peds;},useBtn,crime,startMission,setPaused:v=>paused=v,shoot,tile,solidAt,get M(){return M;},get stars(){return stars;}};
+window.G={gtStats:()=>GT&&GT.stats,boot,update,render,P,nextWeapon,makePed,get GV(){return GV;},nodes,get LM(){return LM;},get map(){return map;},Hat,get STOPS(){return STOPS;},get SPOTS(){return SPOTS;},makeCar,tileAt,get cars(){return cars;},get peds(){return peds;},useBtn,crime,startMission,setPaused:v=>paused=v,shoot,tile,solidAt,get M(){return M;},get stars(){return stars;}};
 boot();
