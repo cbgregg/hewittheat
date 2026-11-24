@@ -1,0 +1,56 @@
+<!DOCTYPE html>
+<html lang="en"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no">
+<title>Hewitt Heat — Downtown Everett</title>
+<style>
+html,body{margin:0;height:100%;overflow:hidden;background:#101418;font-family:system-ui,-apple-system,sans-serif;color:#fff;touch-action:none;-webkit-user-select:none;user-select:none;-webkit-touch-callout:none}
+#c,#h{position:fixed;inset:0;width:100%;height:100%;display:block;touch-action:none}
+.btn{position:fixed;width:78px;height:78px;border-radius:50%;border:2px solid rgba(255,255,255,.55);background:rgba(15,20,28,.55);color:#fff;font:700 13px system-ui,sans-serif;letter-spacing:.04em;touch-action:none}
+.btn:active{background:rgba(255,255,255,.3)}
+#fire{right:18px;bottom:44px;border-color:#ff7a66}
+#use{right:104px;bottom:96px;border-color:#ffd23f}#wpn{right:26px;bottom:134px;width:58px;height:58px;font-size:11px;border-color:#9fd0ff}
+#mapb{position:fixed;left:12px;top:134px;padding:7px 12px;border-radius:8px;border:1px solid rgba(255,255,255,.5);background:rgba(15,20,28,.6);color:#fff;font:700 12px system-ui,sans-serif}
+.ov{position:fixed;inset:0;background:rgba(10,14,20,.93);display:flex;flex-direction:column;align-items:center;z-index:5;overflow:auto;-webkit-user-select:none}
+#intro{justify-content:center;text-align:center;padding:20px;box-sizing:border-box}
+#intro h1{font-size:44px;line-height:.95;margin:0;font-weight:900;letter-spacing:-.02em;color:#ffd23f;text-shadow:3px 3px 0 #b8322a}
+#intro h2{font-size:14px;letter-spacing:.3em;font-weight:700;margin:10px 0 22px;color:#9fc3d9}
+#intro table{border-collapse:collapse;font-size:13px;text-align:left;margin:0 auto 22px;max-width:420px}
+#intro td{padding:5px 8px;border-bottom:1px solid rgba(255,255,255,.12);vertical-align:top}
+#intro td:first-child{color:#ffd23f;font-weight:700;white-space:nowrap}
+#start:disabled{opacity:.6}.go{padding:14px 34px;border-radius:10px;border:0;background:#ffd23f;color:#111;font:800 17px system-ui,sans-serif}
+.bar{display:flex;gap:8px;flex-wrap:wrap;justify-content:center;padding:10px;flex:none}
+.bar button{padding:10px 14px;border-radius:8px;border:1px solid rgba(255,255,255,.4);background:#1c2530;color:#fff;font:700 13px system-ui,sans-serif}
+#mapwrap{flex:1;overflow:auto;width:100%;touch-action:pan-x pan-y;-webkit-overflow-scrolling:touch}
+#mapc{width:1500px;max-width:none;display:block;margin:0 auto}
+#pdfmsg{font-size:12px;color:#9fc3d9;align-self:center}
+.leg{font-size:12px;color:#c9d3db;padding:0 12px 8px;text-align:center;flex:none}
+</style>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js" async></script>
+</head><body>
+<canvas id="c"></canvas><div id="gattr" style="position:fixed;left:8px;bottom:6px;font:11px system-ui,sans-serif;color:#fff;text-shadow:0 0 3px #000;z-index:2;pointer-events:none;max-width:60%"></div><canvas id="h"></canvas>
+<button class="btn" id="use">ENTER</button>
+<button class="btn" id="fire">FIRE</button>
+<button class="btn" id="wpn" style="display:none">WPN</button>
+<button id="mapb">MAP</button>
+<div class="ov" id="intro">
+<h1>HEWITT<br>HEAT</h1><h2>DOWNTOWN EVERETT</h2>
+<table>
+<tr><td>Move / drive</td><td>Drag: up is forward, sideways steers, down reverses &middot; WASD</td></tr>
+<tr><td>ENTER / FIRE</td><td>Take any car (E) &middot; shoot or handbrake (Space) &middot; WPN swaps guns (Q)</td></tr>
+<tr><td>Jobs</td><td>Courier at Everett Station &middot; car export at the Port &middot; street race at the Arena</td></tr>
+<tr><td>Shifts</td><td>Steal a taxi for fares &middot; steal a bus to run real Everett Transit stops</td></tr>
+<tr><td>Also</td><td>25 hidden packages &middot; body shop on Broadway &middot; Guns &amp; Ammo on Hewitt &middot; heal at Providence</td></tr>
+</table>
+<p style="font-size:12px;color:#9fc3d9;margin:-8px 0 18px">Best in landscape with sound on. Real streets, building footprints and hills from City of Everett GIS.</p>
+<button class="go" id="start">START</button>
+</div>
+<div class="ov" id="mapov" style="display:none">
+<div class="bar"><button id="resume">Resume</button><button id="pdf" style="display:none">Save as PDF</button><button id="snd">Sound: on</button><button id="newgame">New game</button><span id="pdfmsg"></span></div>
+<div class="leg">Red = you &middot; Yellow = jobs &middot; Pink = race &middot; Orange = body shop &middot; Green = ammo &middot; Cyan = packages &middot; <span id="pkc"></span></div>
+<div class="bar" style="padding-top:0"><input id="gkey" placeholder="Google Map Tiles API key" autocomplete="off" style="padding:9px;border-radius:8px;border:1px solid #556;background:#111820;color:#fff;font-size:13px;width:230px"><button id="gon">Use Google 3D</button><button id="goff">Off</button><span id="gmsg" style="font-size:12px;color:#9fc3d9;align-self:center"></span></div>
+<div id="mapwrap"><canvas id="mapc"></canvas></div>
+</div>
+<script>window.EV_NOAIR=1</script>
+<script type="importmap">{"imports":{"three":"./lib/three/build/three.module.min.js","three/addons/":"./lib/three/examples/jsm/","three/examples/jsm/":"./lib/three/examples/jsm/"}}</script>
+<script type="module" src="js/game.js"></script>
+</body></html>
