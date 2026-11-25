@@ -645,9 +645,9 @@ async function enableGoogleTiles(key){const msg=t=>{const e=document.getElementB
   const gz=parseFloat(new URLSearchParams(location.search).get('gz'));GTG.position.y=isNaN(gz)?220:gz;scene.add(GTG);
   let ok=false;t.addEventListener('load-tile-set',()=>{if(!ok){ok=true;for(const m of STATIC)m.visible=false;msg('Google 3D Tiles on');}});
   t.addEventListener('load-error',e=>{if(!ok)msg('Google tiles failed to load. Check the key, that Map Tiles API is enabled, and the referrer restriction.');});
-  GT=t;try{localStorage.setItem('everett_gkey',key);}catch(e){}
+  GT=t;try{localStorage.setItem('everett_gkey',key);localStorage.removeItem('everett_goff');}catch(e){}
  }catch(e){console.warn(e);msg('Google 3D Tiles are not available here: '+(e&&e.message||e));}}
-function disableGoogleTiles(){try{localStorage.removeItem('everett_gkey');}catch(e){}if(GT){scene.remove(GTG);GT.dispose();GT=null;for(const m of STATIC)m.visible=true;}const e=document.getElementById('gattr');if(e)e.textContent='';const g2=document.getElementById('gmsg');if(g2)g2.textContent='Google 3D Tiles off';}
+function disableGoogleTiles(){try{localStorage.removeItem('everett_gkey');localStorage.setItem('everett_goff','1');}catch(e){}if(GT){scene.remove(GTG);GT.dispose();GT=null;for(const m of STATIC)m.visible=true;}const e=document.getElementById('gattr');if(e)e.textContent='';const g2=document.getElementById('gmsg');if(g2)g2.textContent='Google 3D Tiles off';}
 const sigState=v=>{const ph=time%18,vg=ph>=9,yl=(ph%9)>7.3;return v===vg?(yl?1:2):0;};
 const SUNV=new THREE.Vector3(-0.45,0.78,0.42).normalize();
 function render(){
@@ -770,7 +770,8 @@ async function boot(){
  ub.addEventListener('pointerdown',e=>{useBtn();e.preventDefault();});
  $('wpn').addEventListener('pointerdown',e=>{nextWeapon();e.preventDefault();});
  $('gon').addEventListener('click',()=>{const k=$('gkey').value.trim();if(k)enableGoogleTiles(k);});$('goff').addEventListener('click',disableGoogleTiles);
- try{const k=localStorage.getItem('everett_gkey');if(k){$('gkey').value=k;enableGoogleTiles(k);}}catch(e){}
+ /* Built-in key: locked by Google to this site's address and to the Map Tiles API, so it is safe to ship. */
+ try{const own=location.hostname==='cbgregg.github.io',k=localStorage.getItem('everett_gkey')||(own&&!localStorage.getItem('everett_goff')?'AIzaSyCMqLVWaLUmddEWfl7vAkAL26TbuepnMSw':'');if(k){$('gkey').value=k;enableGoogleTiles(k);}}catch(e){}
  $('mapb').addEventListener('click',toggleMap);$('resume').addEventListener('click',toggleMap);
  $('start').addEventListener('click',()=>{$('intro').style.display='none';paused=false;initAudio();if(AC&&AC.resume)AC.resume();});
  $('snd').addEventListener('click',()=>{sndOn=!sndOn;$('snd').textContent='Sound: '+(sndOn?'on':'off');});
