@@ -116,3 +116,7 @@ Characters built on the avatar rig open their mouths in time with their lines.
 ## Interior sets
 
 `models/set_office.glb` is Pruitt's office, modelled in Blender (`tools/build_office.py`). A chapter with `"set":"office"` in `data/story.json` plays its briefing inside the set: the two actors are moved into the building, the city shell is hidden for the scene, and everything is restored when it ends. If the player arrives in a car the scene plays outside as before.
+
+`models/set_chamber.glb` is the council chamber (`tools/build_chamber.py`). A chapter can also stage its ending in a set (`"oset"`) and its MEANWHILE scene in one (`"pset"` with `"pat"` naming the landmark). Sets carry their own lights and the sun is dimmed while one is showing.
+
+All nine story voices are now custom designs ("HH" voices on the ElevenLabs account); all 133 story lines use them.

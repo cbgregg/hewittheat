@@ -34,7 +34,7 @@ let CITY=null,DBGC=null;const PROPS={},SETS={};
 async function loadWorld(){
  WORLD=await (await fetch('data/world.json')).json();try{CITY=(await new GLTFLoader().loadAsync('data/city.glb')).scene;}catch(e){console.warn('city model unavailable, using generated buildings',e);CITY=null;}
  await Promise.all(['lamp','signal','busstop','tree','pine','hydrant','bench','trash'].map(async k=>{try{PROPS[k]=(await new GLTFLoader().loadAsync('models/p_'+k+'.glb')).scene;}catch(e){console.warn('prop missing',k);}}));
- try{const g=(await new GLTFLoader().loadAsync('models/set_office.glb')).scene;g.visible=false;g.traverse(o=>{if(o.isMesh){o.castShadow=false;o.receiveShadow=/^floor|^shell/.test(o.name);}});SETS.office=g;}catch(e){console.warn('office set missing');}MW=WORLD.mw;MH=WORLD.mh;WW=MW*T;WH=MH*T;
+ for(const k of ['office','chamber'])try{const g=(await new GLTFLoader().loadAsync('models/set_'+k+'.glb')).scene;g.visible=false;g.traverse(o=>{if(o.isMesh){o.castShadow=false;o.receiveShadow=/^floor|^shell/.test(o.name);}});const a=new THREE.PointLight(0xffe2bd,1.5,0,0);a.position.set(0,30,0);const b=new THREE.PointLight(0xdcebff,0.8,0,0);b.position.set(-30,24,-40);g.add(a,b);SETS[k]=g;}catch(e){console.warn('set missing',k);}MW=WORLD.mw;MH=WORLD.mh;WW=MW*T;WH=MH*T;
  const md=pixels(await loadImg('data/map.png'));map=new Uint8Array(MW*MH);for(let i=0;i<MW*MH;i++)map[i]=Math.round(md[i*4]/30);
  const hd=pixels(await loadImg('data/hm.png'));gw=WORLD.gw;gh=WORLD.gh;GS=WORLD.gs*10;HMAP=new Float32Array(gw*gh);for(let i=0;i<gw*gh;i++)HMAP[i]=((hd[i*4]<<8)|hd[i*4+1])-1000;
  if(window.EV_NOAIR)AIRIMG=[null,null,null,null,null,null];else{for(let ty=0;ty<2;ty++)for(let tx=0;tx<3;tx++)AIRIMG.push(loadImg('data/airlo_'+tx+'_'+ty+'.jpg').catch(()=>null));AIRIMG=await Promise.all(AIRIMG);}
@@ -221,9 +221,11 @@ function stStep(){const ch=M.ch;if(M.si>=0){const ps=ch.steps[M.si];if(ps&&ps.do
  else if(s.t==='scene'){M.hide=true;M.tx=P.x;M.ty=P.y;pts=0;cool=0;RQ.length=0;if(NOCUT){stStep();return;}const m=M;playScene(s.lines,ch.id+'_s'+M.si+'l',{},()=>{if(M===m)stStep();});return;}
  if(M.si>0)sfx('pick');}
 function beginChapter(ch){M={type:'story',ch,si:-1,time:0,reward:ch.reward,text:''};big={t:ch.title,c:'#40e0ff',time:2.2};sfx('job');stStep();}
-function stageOn(ch){const S=ch.set&&SETS[ch.set];if(!S||P.car)return null;const g=ch.ped,l=lm(ch.at),cx=l.cx,cy=l.cy,sv=[P.x,P.y,P.a,g.x,g.y,g.a,g.fa];
- P.x=cx-11;P.y=cy+2;P.a=0;g.x=cx+11;g.y=cy-2;g.a=PI;g.fa=PI;S.position.set(cx,Math.max(Hat(cx-11,cy+2),Hat(cx+11,cy-2))+0.6,cy);if(!S.parent)scene.add(S);S.visible=true;if(CITY)CITY.visible=false;
- return()=>{S.visible=false;if(CITY)CITY.visible=!(GT&&gReady);P.x=sv[0];P.y=sv[1];P.a=sv[2];g.x=sv[3];g.y=sv[4];g.a=sv[5];g.fa=sv[6];};}
+function setShow(name,cx,cy,hy){const S=SETS[name];if(!S)return null;for(const k in SETS)SETS[k].visible=false;S.position.set(cx,hy+0.6,cy);if(!S.parent)scene.add(S);S.visible=true;for(const m of STATIC)m.visible=false;sun.intensity=0.8;return S;}
+function setHide(){for(const k in SETS)SETS[k].visible=false;if(!(GT&&gReady))for(const m of STATIC)m.visible=true;sun.intensity=2.6;}
+function stageOn(ch){if(!(ch.set&&SETS[ch.set])||P.car)return null;const g=ch.ped,l=lm(ch.at),cx=l.cx,cy=l.cy,sv=[P.x,P.y,P.a,g.x,g.y,g.a,g.fa];
+ P.x=cx-11;P.y=cy+2;P.a=0;g.x=cx+11;g.y=cy-2;g.a=PI;g.fa=PI;setShow(ch.set,cx,cy,Math.max(Hat(cx-11,cy+2),Hat(cx+11,cy-2)));
+ return()=>{setHide();P.x=sv[0];P.y=sv[1];P.a=sv[2];g.x=sv[3];g.y=sv[4];g.a=sv[5];g.fa=sv[6];};}
 function startStory(ch){if(NOCUT){beginChapter(ch);say(ch.giver.toUpperCase()+': '+ch.intro[0].t,6);return;}
  const g=ch.ped,un=stageOn(ch),n=STORY.indexOf(ch)+1,b=buildScene(ch.intro,ch.id+'_intro',{giver:g});b.shots.unshift({cam:pickCam(shotWide(P,g,1),shotWide(P,g,-1),shotWide(P,g,0.6),shotWide(P,g,-0.6),shotOTS(P,g,1)),d:2.6,title:'CHAPTER '+n,sub:ch.title});playCut(b.shots,()=>{b.cleanup();if(un)un();beginChapter(ch);});}
 function storyStep(dt){const s=M.step,d=dist(P.x,P.y,M.tx,M.ty),slow=!P.car||Math.abs(P.car.v)<60;
@@ -235,8 +237,10 @@ function storyStep(dt){const s=M.step,d=dist(P.x,P.y,M.tx,M.ty),slow=!P.car||Mat
 function storyDone(m){const ch=m.ch;P.money+=ch.reward;ST++;saveStory();save();syncStoryPed();needPack();stCd=14;RQ.length=0;const last=ST>=STORY.length,news=()=>setTimeout(()=>{vo('st_'+ch.id+'_news',null,null,1.3);say('RADIO: '+ch.news,9);},1200);pts=0;cool=0;
  if(NOCUT){big={t:(last?'STORY COMPLETE':'CHAPTER COMPLETE')+'  +$'+ch.reward,c:'#40e0ff',time:4};news();return;}
  const shots=[{cam:SH.orbit(()=>P.x,()=>P.y,58,20,P.a+2.4,0.22,12),d:2.8,title:'MISSION PASSED',sub:'+$'+ch.reward,gold:1,sfx:'win'}],cl=[];
- const o=buildScene(ch.outro||[],ch.id+'_outro',{});shots.push(...o.shots);cl.push(o.cleanup);
- if(ch.post){const q=buildScene(ch.post,ch.id+'_post',{cutaway:1});if(q.shots.length){q.shots[0].card='MEANWHILE';shots.push(...q.shots);cl.push(q.cleanup);}}
+ const nx=ST<STORY.length?STORY[ST]:null,unO=(ch.oset&&nx&&nx.ped&&(ch.outro||[]).some(l=>l.w===nx.ped.cw))?stageOn({set:ch.oset,ped:nx.ped,at:nx.at}):null;
+ const o=buildScene(ch.outro||[],ch.id+'_outro',{});shots.push(...o.shots);cl.push(o.cleanup);if(unO)cl.push(unO);
+ if(ch.post){const ps=(ch.pset&&SETS[ch.pset])?lm(ch.pat):null,sv=[P.x,P.y,P.a];if(ps){P.x=ps.cx-20;P.y=ps.cy;P.a=0;}const q=buildScene(ch.post,ch.id+'_post',{cutaway:1});if(ps){P.x=sv[0];P.y=sv[1];P.a=sv[2];}
+  if(q.shots.length){q.shots[0].card='MEANWHILE';if(ps){const f0=q.shots[0].on;q.shots[0].on=()=>{setShow(ch.pset,ps.cx,ps.cy,Hat(ps.cx-20,ps.cy));if(f0)f0();};cl.push(setHide);}shots.push(...q.shots);cl.push(q.cleanup);}}
  if(last){EPI.forEach((l,i)=>shots.push(flyShot(l,'epi_'+i)));shots.push({cam:SH.orbit(WW/2,WH/2,2600,900,2,0.04,80),d:4,title:'HEWITT HEAT',sub:'THE END'},
   {cam:SH.orbit(WW/2,WH/2,2600,900,2.2,0.04,80),d:10,credits:['A game by Carter Gregg, built with Claude','Map: City of Everett GIS · Google Photorealistic 3D Tiles','Vehicles: Daniel Zhabotinsky (CC BY) · Weapons: TastyTony (CC BY)','Street props, trees and two civilians: Sketchfab artists, CC BY (full list in README)','Voices and sound: ElevenLabs stock voices','Every character in the story is fictional']});}
  playCut(shots,()=>{cl.forEach(f=>f());news();if(last)say('Story complete. Downtown and the county are yours.',6);});}
@@ -956,5 +960,5 @@ function toggleMap(){const o=document.getElementById('mapov');if(document.getEle
   {const cm=document.getElementById('cmap');if(cm){buildCounty();cm.style.display=CW?'block':'none';if(CW)drawCountyMap(cm);}}
   document.getElementById('pkc').textContent='Packages '+Object.keys(pkgGot).length+'/'+PKG.length;
   const w=document.getElementById('mapwrap');w.scrollLeft=P.x/WW*c.clientWidth-w.clientWidth/2;{const cm=document.getElementById('cmap'),ch=cm&&cm.style.display!=='none'?cm.clientHeight+12:0;w.scrollTop=OOB(P.x,P.y)?0:ch+P.y/WH*c.clientHeight-w.clientHeight/2;}}}
-window.G={cam:v=>{DBGC=v;if(!v)CAMO=null;},gtStats:()=>GT&&GT.stats,boot,update,render,P,nextWeapon,makePed,get GV(){return GV;},nodes,get LM(){return LM;},get map(){return map;},Hat,get STOPS(){return STOPS;},get SPOTS(){return SPOTS;},makeCar,tileAt,get cars(){return cars;},get peds(){return peds;},useBtn,crime,startMission,setPaused:v=>paused=v,shoot,tile,solidAt,get M(){return M;},get stars(){return stars;},VSPEC,GUN,SND,get STORY(){return STORY;},get ST(){return ST;},set ST(v){ST=v;syncStoryPed();},get CONTACTS(){return CONTACTS;},setPts:v=>{pts=v;cool=0;},lm,missionStep,travel,startStoryMode,startFree,toMenu,get CUT(){return CUT;},get MODE(){return MODE;},get MENU(){return MENU;},skip:()=>{skipTap=true;},OOB,get CW(){return CW;},get gReady(){return gReady;},gCast};
+window.G={cam:v=>{DBGC=v;if(!v)CAMO=null;},setShow,setHide,gtStats:()=>GT&&GT.stats,boot,update,render,P,nextWeapon,makePed,get GV(){return GV;},nodes,get LM(){return LM;},get map(){return map;},Hat,get STOPS(){return STOPS;},get SPOTS(){return SPOTS;},makeCar,tileAt,get cars(){return cars;},get peds(){return peds;},useBtn,crime,startMission,setPaused:v=>paused=v,shoot,tile,solidAt,get M(){return M;},get stars(){return stars;},VSPEC,GUN,SND,get STORY(){return STORY;},get ST(){return ST;},set ST(v){ST=v;syncStoryPed();},get CONTACTS(){return CONTACTS;},setPts:v=>{pts=v;cool=0;},lm,missionStep,travel,startStoryMode,startFree,toMenu,get CUT(){return CUT;},get MODE(){return MODE;},get MENU(){return MENU;},skip:()=>{skipTap=true;},OOB,get CW(){return CW;},get gReady(){return gReady;},gCast};
 boot();
