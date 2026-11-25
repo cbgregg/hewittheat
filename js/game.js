@@ -30,10 +30,11 @@ function streetAt(x,y){const cx=Math.floor(x/600),cy=Math.floor(y/600);let bn=nu
 function xnode(n1,n2){for(let i=0;i<nodes.length;i++){const s=new Set(nodes[i].nb.map(k=>edges.get(i*65536+k).name));if(s.has(n1)&&s.has(n2))return i;}return -1;}
 async function loadImg(src){const im=new Image();im.src=src;await im.decode();return im;}
 function pixels(im){const c=document.createElement('canvas');c.width=im.naturalWidth;c.height=im.naturalHeight;const x=c.getContext('2d',{willReadFrequently:true});x.drawImage(im,0,0);return x.getImageData(0,0,c.width,c.height).data;}
-let CITY=null,DBGC=null;const PROPS={};
+let CITY=null,DBGC=null;const PROPS={},SETS={};
 async function loadWorld(){
  WORLD=await (await fetch('data/world.json')).json();try{CITY=(await new GLTFLoader().loadAsync('data/city.glb')).scene;}catch(e){console.warn('city model unavailable, using generated buildings',e);CITY=null;}
- await Promise.all(['lamp','signal','busstop','tree','pine','hydrant','bench','trash'].map(async k=>{try{PROPS[k]=(await new GLTFLoader().loadAsync('models/p_'+k+'.glb')).scene;}catch(e){console.warn('prop missing',k);}}));MW=WORLD.mw;MH=WORLD.mh;WW=MW*T;WH=MH*T;
+ await Promise.all(['lamp','signal','busstop','tree','pine','hydrant','bench','trash'].map(async k=>{try{PROPS[k]=(await new GLTFLoader().loadAsync('models/p_'+k+'.glb')).scene;}catch(e){console.warn('prop missing',k);}}));
+ try{const g=(await new GLTFLoader().loadAsync('models/set_office.glb')).scene;g.visible=false;g.traverse(o=>{if(o.isMesh){o.castShadow=false;o.receiveShadow=/^floor|^shell/.test(o.name);}});SETS.office=g;}catch(e){console.warn('office set missing');}MW=WORLD.mw;MH=WORLD.mh;WW=MW*T;WH=MH*T;
  const md=pixels(await loadImg('data/map.png'));map=new Uint8Array(MW*MH);for(let i=0;i<MW*MH;i++)map[i]=Math.round(md[i*4]/30);
  const hd=pixels(await loadImg('data/hm.png'));gw=WORLD.gw;gh=WORLD.gh;GS=WORLD.gs*10;HMAP=new Float32Array(gw*gh);for(let i=0;i<gw*gh;i++)HMAP[i]=((hd[i*4]<<8)|hd[i*4+1])-1000;
  if(window.EV_NOAIR)AIRIMG=[null,null,null,null,null,null];else{for(let ty=0;ty<2;ty++)for(let tx=0;tx<3;tx++)AIRIMG.push(loadImg('data/airlo_'+tx+'_'+ty+'.jpg').catch(()=>null));AIRIMG=await Promise.all(AIRIMG);}
@@ -220,8 +221,11 @@ function stStep(){const ch=M.ch;if(M.si>=0){const ps=ch.steps[M.si];if(ps&&ps.do
  else if(s.t==='scene'){M.hide=true;M.tx=P.x;M.ty=P.y;pts=0;cool=0;RQ.length=0;if(NOCUT){stStep();return;}const m=M;playScene(s.lines,ch.id+'_s'+M.si+'l',{},()=>{if(M===m)stStep();});return;}
  if(M.si>0)sfx('pick');}
 function beginChapter(ch){M={type:'story',ch,si:-1,time:0,reward:ch.reward,text:''};big={t:ch.title,c:'#40e0ff',time:2.2};sfx('job');stStep();}
+function stageOn(ch){const S=ch.set&&SETS[ch.set];if(!S||P.car)return null;const g=ch.ped,l=lm(ch.at),cx=l.cx,cy=l.cy,sv=[P.x,P.y,P.a,g.x,g.y,g.a,g.fa];
+ P.x=cx-11;P.y=cy+2;P.a=0;g.x=cx+11;g.y=cy-2;g.a=PI;g.fa=PI;S.position.set(cx,Math.max(Hat(cx-11,cy+2),Hat(cx+11,cy-2))+0.6,cy);if(!S.parent)scene.add(S);S.visible=true;if(CITY)CITY.visible=false;
+ return()=>{S.visible=false;if(CITY)CITY.visible=!(GT&&gReady);P.x=sv[0];P.y=sv[1];P.a=sv[2];g.x=sv[3];g.y=sv[4];g.a=sv[5];g.fa=sv[6];};}
 function startStory(ch){if(NOCUT){beginChapter(ch);say(ch.giver.toUpperCase()+': '+ch.intro[0].t,6);return;}
- const g=ch.ped,n=STORY.indexOf(ch)+1,b=buildScene(ch.intro,ch.id+'_intro',{giver:g});b.shots.unshift({cam:pickCam(shotWide(P,g,1),shotWide(P,g,-1),shotWide(P,g,0.6),shotWide(P,g,-0.6),shotOTS(P,g,1)),d:2.6,title:'CHAPTER '+n,sub:ch.title});playCut(b.shots,()=>{b.cleanup();beginChapter(ch);});}
+ const g=ch.ped,un=stageOn(ch),n=STORY.indexOf(ch)+1,b=buildScene(ch.intro,ch.id+'_intro',{giver:g});b.shots.unshift({cam:pickCam(shotWide(P,g,1),shotWide(P,g,-1),shotWide(P,g,0.6),shotWide(P,g,-0.6),shotOTS(P,g,1)),d:2.6,title:'CHAPTER '+n,sub:ch.title});playCut(b.shots,()=>{b.cleanup();if(un)un();beginChapter(ch);});}
 function storyStep(dt){const s=M.step,d=dist(P.x,P.y,M.tx,M.ty),slow=!P.car||Math.abs(P.car.v)<60;
  if(M.car&&(M.car.dead||M.car.gone)){endMission(false,'The vehicle was destroyed');return;}
  if(s.t==='go'){if(s.car&&!P.car){M.hint=1;return;}if(d<(P.car?130:75)&&slow)stStep();}

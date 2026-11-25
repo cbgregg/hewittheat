@@ -112,3 +112,7 @@ Two chapters now open the story: WELCOME BACK (the booted car and the walk to Pr
 Danny, Marge, Pruitt and the lot attendant use custom ElevenLabs voices designed from written briefs (saved on the account as "HH Danny" and so on), and every existing line by those characters was re-recorded with them. The other characters still use their earlier voices. `tools/voices_design.py` and `tools/voices_synth.py` rebuild the audio; the key is read from the `ELEVEN` environment variable.
 
 Characters built on the avatar rig open their mouths in time with their lines.
+
+## Interior sets
+
+`models/set_office.glb` is Pruitt's office, modelled in Blender (`tools/build_office.py`). A chapter with `"set":"office"` in `data/story.json` plays its briefing inside the set: the two actors are moved into the building, the city shell is hidden for the scene, and everything is restored when it ends. If the player arrives in a car the scene plays outside as before.
