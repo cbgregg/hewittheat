@@ -104,3 +104,11 @@ All from Sketchfab under CC BY 4.0, modified for the game (re-based, scaled, tex
 `tools/sketchfab_dl.py` and `tools/sketchfab_prep.py` rebuild them; the Sketchfab token is read from the `SKF` environment variable and is not stored in this repository.
 
 Shadows use a 4096 map on desktop, and window glass on the building materials picks up sun glints.
+
+## Opening chapters and voices
+
+Two chapters now open the story: WELCOME BACK (the booted car and the walk to Pruitt's office) and 90 MINUTES (towing cars the moment their meters expire). Chapter data is in `data/story.json`; their lines are in `data/vo_w1.json` and `data/vo_w2.json`.
+
+Danny, Marge, Pruitt and the lot attendant use custom ElevenLabs voices designed from written briefs (saved on the account as "HH Danny" and so on), and every existing line by those characters was re-recorded with them. The other characters still use their earlier voices. `tools/voices_design.py` and `tools/voices_synth.py` rebuild the audio; the key is read from the `ELEVEN` environment variable.
+
+Characters built on the avatar rig open their mouths in time with their lines.

@@ -682,7 +682,7 @@ function mkPed(p){const G=new THREE.Group(),u=G.userData,pl=p===P,cop=p.kind==='
    if(p.ch==='rpm'){q.material=/Outfit_Top/.test(nm)?tinted(q.material,sh):/Outfit_Bottom/.test(nm)?tinted(q.material,pa):/Skin|Body/.test(nm)?tinted(q.material,tn):/Headwear/.test(nm)?tinted(q.material,LK.hw||(pl?'#b3261e':pick(SHIRT))):q.material;if(LK.nohat&&/Headwear/.test(nm))q.visible=false;}
    else if(p.ch==='man'||p.ch==='woman'){q.material=nm==='clothing'?tinted(q.material,sh):nm==='pants'?tinted(q.material,pa):nm==='skin'?tinted(q.material,LK.tn||(tn==='#ffffff'?TONE[1]:tn)):nm==='hair'?tinted(q.material,LK.hair||pick(HAIR)):nm==='shoes'?tinted(q.material,'#2a2622'):q.material;}
    else q.material=tinted(q.material,one);});
-  m.traverse(n=>{if(n.isBone&&!u.head&&/Head$/.test(n.name))u.head=n;});u.mx=new THREE.AnimationMixer(m);const A=n=>{const cl=c.anim&&c.anim[n];if(!cl)return null;const a=u.mx.clipAction(cl);a.play();return a;};u.idle=A('Idle');u.walk=A('Walk');u.run=A('Run');if(u.walk&&u.idle)u.walk.setEffectiveWeight(0);if(u.run)u.run.setEffectiveWeight(0);u.w=[1,0,0];u.mx.update(Math.random());if(pl)attachGuns(u,m,['pistol','smg','shotgun','rifle']);else if(cop)attachGuns(u,m,['pistol']);}
+  m.traverse(n=>{if(n.isBone&&!u.head&&/Head$/.test(n.name))u.head=n;if(n.isMesh&&n.morphTargetDictionary){const d=n.morphTargetDictionary;if(d.mouthOpen!=null){(u.mo=u.mo||[]).push([n,d.mouthOpen,d.mouthSmile]);}}});u.mx=new THREE.AnimationMixer(m);const A=n=>{const cl=c.anim&&c.anim[n];if(!cl)return null;const a=u.mx.clipAction(cl);a.play();return a;};u.idle=A('Idle');u.walk=A('Walk');u.run=A('Run');if(u.walk&&u.idle)u.walk.setEffectiveWeight(0);if(u.run)u.run.setEffectiveWeight(0);u.w=[1,0,0];u.mx.update(Math.random());if(pl)attachGuns(u,m,['pistol','smg','shotgun','rifle']);else if(cop)attachGuns(u,m,['pistol']);}
  else{const In=new THREE.Group();G.add(In);u.In=In;box(3.4,7.5,6.2,pl?'#eee':cop?'#27407a':p.col,0,13,0,In);box(3.4,3.8,3.4,'#d9a982',0,19.6,0,In);box(3,9,5.6,'#333',0,4.5,0,In);}
  if(p.nm){const s=textSprite(p.nm,'#ffe9a0',0.22);s.position.y=27;G.add(s);}
  return G;}
@@ -691,7 +691,8 @@ function syncPed(p,dead,dt){const m=ent(p,mkPed),u=m.userData,mv=Math.hypot(p.x-
  if(u.mx&&!dead&&m.visible){const s=dt>0?mv/dt:0;u.sp+=(s-u.sp)*Math.min(1,dt*10);
   if(u.idle){const t=u.sp<3?[1,0,0]:u.sp<32?[0,1,0]:[0,0,1],k=Math.min(1,dt*9);for(let i=0;i<3;i++)u.w[i]+=(t[i]-u.w[i])*k;u.idle.setEffectiveWeight(u.w[0]);u.walk.setEffectiveWeight(u.w[1]);u.run.setEffectiveWeight(u.w[2]);u.walk.timeScale=clamp(u.sp/15,0.7,1.7);u.run.timeScale=clamp(u.sp/58,0.75,1.5);}
   else if(u.walk)u.walk.timeScale=u.sp<3?0:clamp(u.sp/14,0.7,3.2);
-  if(Math.abs(p.x-P.x)+Math.abs(p.y-P.y)<2400)u.mx.update(dt);}
+  if(Math.abs(p.x-P.x)+Math.abs(p.y-P.y)<2400)u.mx.update(dt);
+  if(u.mo){const tv=p.talk?0.18+0.62*Math.abs(Math.sin(time*12.5+u.px))*(0.55+0.45*Math.sin(time*4.7+u.py)):0;u.mv=(u.mv||0)+(tv-(u.mv||0))*Math.min(1,dt*20);for(const q of u.mo){q[0].morphTargetInfluences[q[1]]=u.mv;if(q[2]!=null)q[0].morphTargetInfluences[q[2]]=p.talk?0.12:0;}}}
  if(u.guns){const pl=p===P,cop=p.kind==='cop',wp=pl?(P.ammo>0?P.wp:null):(cop&&stars>0?'pistol':null);for(const k in u.guns)u.guns[k].visible=!dead&&k===wp;
   const aim=!dead&&wp&&(pl?(AIM||P.shot>time-0.45):(stars>=2&&p.cd<0.5&&dist(p.x,p.y,P.x,P.y)<480));
   if(aim&&u.arm&&u.fore&&u.hand){_ad.set(Math.cos(p.a),pl?clamp(0.22-pitch,-0.5,0.4):0,Math.sin(p.a)).normalize();aimBone(u.arm,u.fore,_ad);aimBone(u.fore,u.hand,_ad);if(u.mid)aimBone(u.hand,u.mid,_ad);}
