@@ -85,9 +85,9 @@ python3 tools/render_city.py /tmp/stage/data/city_full.glb . renders   # Blender
 
 ## Street props and people
 
-The box placeholders for street lamps, signals, bus stops and trees are replaced with instanced models, and hydrants, picnic tables and trash barrels are added along streets and at bus stops. Two Mixamo-rigged civilians replace the placeholder figure and share the existing Idle / Walk / Run clips. If a model fails to load the game falls back to the old shapes.
+The box placeholders for street lamps, signals, bus stops and trees are replaced with instanced models, and hydrants, picnic tables and trash barrels are added along streets and at bus stops. The placeholder figure is no longer used for pedestrians. If a model fails to load the game falls back to the old shapes.
 
-All from Sketchfab under CC BY 4.0, modified for the game (re-based, scaled, textures reduced; people: bones renamed to the Mixamo standard, outfit split into shirt and pants):
+All from Sketchfab under CC BY 4.0, modified for the game (re-based, scaled, textures reduced):
 
 | Model | Author |
 |---|---|
@@ -99,7 +99,6 @@ All from Sketchfab under CC BY 4.0, modified for the game (re-based, scaled, tex
 | Fire Hydrant [Low Poly] | Islide |
 | Low-Poly Wooden Bench | Memorie |
 | Photorealistic Trash Can (LOW POLY) | Derfmode |
-| Low Poly Male, Low Poly Female | Loves_Art |
 
 `tools/sketchfab_dl.py` and `tools/sketchfab_prep.py` rebuild them; the Sketchfab token is read from the `SKF` environment variable and is not stored in this repository.
 
