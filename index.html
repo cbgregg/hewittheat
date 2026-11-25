@@ -52,7 +52,8 @@ html,body{margin:0;height:100%;overflow:hidden;background:#101418;font-family:sy
 <div class="bar"><button id="resume">Resume</button><button id="pdf" style="display:none">Save as PDF</button><button id="snd">Sound: on</button><button id="newgame">New game</button><span id="pdfmsg"></span></div>
 <div class="leg">Red = you &middot; Yellow = jobs &middot; Pink = race &middot; Orange = body shop &middot; Green = ammo &middot; Cyan = packages &middot; <span id="pkc"></span></div>
 <div class="bar" style="padding-top:0"><input id="gkey" placeholder="Google Map Tiles API key" autocomplete="off" style="padding:9px;border-radius:8px;border:1px solid #556;background:#111820;color:#fff;font-size:13px;width:230px"><button id="gon">Use Google 3D</button><button id="goff">Off</button><span id="gmsg" style="font-size:12px;color:#9fc3d9;align-self:center"></span></div>
-<div id="mapwrap"><canvas id="mapc"></canvas></div>
+<div class="bar" style="padding-top:0"><select id="trav" style="padding:9px;border-radius:8px;border:1px solid #556;background:#111820;color:#fff;font-size:13px;max-width:230px"><option value="">Travel in Snohomish County…</option><option value="__home">Downtown Everett (home)</option></select><button id="travgo">Go</button><span style="font-size:12px;color:#9fc3d9;align-self:center">Needs Google 3D on. Or just drive off the edge of the map.</span></div>
+<div id="mapwrap"><canvas id="cmap" style="display:none;width:100%;max-width:1100px;margin:0 auto 12px"></canvas><canvas id="mapc"></canvas></div>
 </div>
 <script>window.EV_NOAIR=1</script>
 <script type="importmap">{"imports":{"three":"./lib/three/build/three.module.min.js","three/addons/":"./lib/three/examples/jsm/","three/examples/jsm/":"./lib/three/examples/jsm/"}}</script>

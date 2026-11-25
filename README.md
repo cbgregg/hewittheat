@@ -59,3 +59,7 @@ Each model was simplified and had its textures reduced for the web.
 ## Audio
 
 Voice lines and sound effects were generated with ElevenLabs, using stock library voices only.
+
+## Beyond downtown
+
+With Google 3D Tiles on, ground height comes from the Google mesh, so ramps, bridge decks and underpasses are driveable and the world continues past the edge of the downtown map. The MAP screen has a travel menu for Snohomish County towns. County boundary, highways and place names: U.S. Census Bureau TIGER/Line (public domain).
