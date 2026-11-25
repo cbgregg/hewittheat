@@ -622,7 +622,7 @@ const MK={};
 function mkMarker(col,l){const G=new THREE.Group();const c=new THREE.Mesh(CYL,new THREE.MeshBasicMaterial({color:new THREE.Color(col),transparent:true,opacity:0.4,side:THREE.DoubleSide,depthWrite:false,toneMapped:false}));c.position.y=22;G.add(c);const s=textSprite(l,col,0.28);s.position.y=56;G.add(s);G.userData.c=c;scene.add(G);return G;}
 function setMarker(k,x,y,vis){const m=MK[k];m.visible=vis;if(!vis)return;m.position.set(x,Hg(x,y),y);const s=1+Math.sin(time*4)*0.08;m.userData.c.scale.set(s,1,s);}
 function init3D(){
- ren=new THREE.WebGLRenderer({canvas:cv,antialias:!LOW,powerPreference:'high-performance'});ren.outputColorSpace=THREE.SRGBColorSpace;ren.toneMapping=THREE.ACESFilmicToneMapping;ren.toneMappingExposure=0.82;
+ ren=new THREE.WebGLRenderer({canvas:cv,antialias:!LOW,powerPreference:'high-performance'});ren.outputColorSpace=THREE.SRGBColorSpace;ren.toneMapping=THREE.ACESFilmicToneMapping;ren.toneMappingExposure=0.82;if(!new URLSearchParams(location.search).has('nofx'))initFX();
  ren.shadowMap.enabled=true;ren.shadowMap.type=THREE.PCFSoftShadowMap;
  scene=new THREE.Scene();scene.background=new THREE.Color(0xb7c6d6);scene.fog=new THREE.Fog(0xc3d0dc,1800,LOW?5200:7000);
  cam3=new THREE.PerspectiveCamera(60,1,3,LOW?5600:7400);
@@ -633,7 +633,24 @@ function init3D(){
 function initMarkers(){GV.forEach((gv,i)=>MK['g'+i]=mkMarker(gv.type==='race'?'#ff5ad0':'#ffd23f',gv.type==='courier'?'COURIER':gv.type==='race'?'RACE':'EXPORT'));PKG.forEach(p=>{p.m=box(9,9,9,0,0,0,0,null,bmat('#40e0ff'));p.m.castShadow=false;scene.add(p.m);});
  MK.shop=mkMarker('#ff8a30','BODY SHOP');MK.pawn=mkMarker('#7ad06a','AMMO');MK.hosp=mkMarker('#ff5a6a','HEAL');MK.tgt=mkMarker('#ffe45a','▼');MK.story=mkMarker('#40e0ff','STORY');}
 /* --- optional: Google Photorealistic 3D Tiles. Needs the player's own Map Tiles API key and a normal web host (blocked inside the Claude artifact). --- */
-const BUILD='Nov 24 6:45pm';let GT=null,GTG=null,gAttrT=0,gReady=false,rayBudget=0,gDt=0.016,CW=null,COUNTY=null;const STATIC=[];
+const BUILD='Nov 24 7:40pm';
+/* ---------- film pass: HDR scene -> sharpen, glow, tone map, grade, grain ---------- */
+let FX=null;const GTKU={value:1};
+function initFX(){try{const sz=ren.getDrawingBufferSize(new THREE.Vector2()),rt=new THREE.WebGLRenderTarget(sz.x,sz.y,{samples:LOW?0:4,type:THREE.HalfFloatType});
+ const mat=new THREE.ShaderMaterial({depthTest:false,depthWrite:false,uniforms:{t:{value:rt.texture},px:{value:new THREE.Vector2(1/sz.x,1/sz.y)},time:{value:0},ex:{value:0.86}},
+  vertexShader:'varying vec2 v;void main(){v=uv;gl_Position=vec4(position.xy,0.,1.);}',
+  fragmentShader:`precision highp float;uniform sampler2D t;uniform vec2 px;uniform float time,ex;varying vec2 v;
+  vec3 tm(vec3 x){x=max(x,0.)*ex/0.6;return clamp((x*(2.51*x+0.03))/(x*(2.43*x+0.59)+0.14),0.,1.);}
+  float h(vec2 p){return fract(sin(dot(p,vec2(12.9898,78.233)))*43758.5453);}
+  void main(){vec3 hc=texture2D(t,v).rgb;vec3 c=tm(hc),n=tm(texture2D(t,v+vec2(0.,px.y)).rgb),s=tm(texture2D(t,v-vec2(0.,px.y)).rgb),e=tm(texture2D(t,v+vec2(px.x,0.)).rgb),w=tm(texture2D(t,v-vec2(px.x,0.)).rgb);
+   vec3 mn=min(c,min(min(n,s),min(e,w))),mx=max(c,max(max(n,s),max(e,w)));vec3 a=sqrt(clamp(min(mn,1.-mx)/max(mx,vec3(1e-3)),0.,1.))*(-1./5.5);c=clamp((c+(n+s+e+w)*a)/(1.+4.*a),0.,1.);
+   vec3 g=vec3(0.);for(int i=0;i<8;i++){float an=float(i)*0.7854+0.4;vec2 o=vec2(cos(an),sin(an));g+=max(texture2D(t,v+o*px*5.).rgb-1.05,0.)+max(texture2D(t,v+o*px*13.).rgb-1.05,0.)*0.6;}c+=tm(g/12.8)*0.55;
+   float l=dot(c,vec3(.2126,.7152,.0722));c=mix(vec3(l),c,1.14);c=mix(c,c*c*(3.-2.*c),0.32);c+=(l-0.5)*vec3(0.035,0.006,-0.04);
+   vec2 q=v-0.5;c*=1.-dot(q,q)*0.5;c+=(h(v*vec2(1./px.x,1./px.y)+fract(time)*61.)-0.5)*0.022;
+   c=clamp(c,0.,1.);gl_FragColor=vec4(mix(c*12.92,1.055*pow(c,vec3(1./2.4))-0.055,step(0.0031308,c)),1.);}`});
+ const sc=new THREE.Scene(),q=new THREE.Mesh(new THREE.PlaneGeometry(2,2),mat);q.frustumCulled=false;sc.add(q);FX={rt,mat,sc,cam:new THREE.OrthographicCamera(-1,1,1,-1,0,1),sz:new THREE.Vector2(sz.x,sz.y),v:new THREE.Vector2()};}catch(e){console.warn('film pass unavailable',e);FX=null;}}
+function drawFrame(){GTKU.value=FX&&qual>0?0.62:1;if(FX&&qual>0){ren.getDrawingBufferSize(FX.v);if(FX.v.x!==FX.sz.x||FX.v.y!==FX.sz.y){FX.sz.copy(FX.v);FX.rt.setSize(FX.v.x,FX.v.y);FX.mat.uniforms.px.value.set(1/FX.v.x,1/FX.v.y);}
+  FX.mat.uniforms.time.value=time;ren.setRenderTarget(FX.rt);ren.render(scene,cam3);ren.setRenderTarget(null);ren.render(FX.sc,FX.cam);}else ren.render(scene,cam3);}let GT=null,GTG=null,gAttrT=0,gReady=false,rayBudget=0,gDt=0.016,CW=null,COUNTY=null;const STATIC=[];
 /* ---------- Google ground: with 3D Tiles on, heights come from the photogrammetry mesh, so bridges, ramps and underpasses work, and the world continues past the downtown map ---------- */
 const RC=new THREE.Raycaster(),RDN=new THREE.Vector3(0,-1,0),RO=new THREE.Vector3(),RDIR=new THREE.Vector3();
 const OOB=(x,y)=>x<0||y<0||x>=WW||y>=WH;
@@ -679,7 +696,7 @@ async function enableGoogleTiles(key){const msg=t=>{const e=document.getElementB
   const t=new T3.TilesRenderer();t.registerPlugin(new T3.GoogleCloudAuthPlugin({apiToken:key}));
   const dr=new D3.DRACOLoader();dr.setDecoderPath('lib/draco/');const gl=new GLTFLoader(t.manager);gl.setDRACOLoader(dr);t.manager.addHandler(/\.(gltf|glb)$/g,gl);
   t.setLatLonToYUp(47.9785*PI/180,-122.2045*PI/180);t.setCamera(cam3);t.setResolutionFromRenderer(cam3,ren);const ge=parseFloat(new URLSearchParams(location.search).get('ge'));t.errorTarget=isNaN(ge)?(LOW?12:6):ge;
-  t.addEventListener('load-model',e=>{e.scene.traverse(m=>{if(m.isMesh&&m.material&&!m.material.isMeshBasicMaterial){const o=m.material;m.material=new THREE.MeshBasicMaterial({map:o.map,toneMapped:false});o.dispose();}});});
+  t.addEventListener('load-model',e=>{e.scene.traverse(m=>{if(m.isMesh&&m.material&&!m.material.userData.gt){const o=m.material;if(o.map){o.map.anisotropy=Math.min(8,ren.capabilities.getMaxAnisotropy());o.map.needsUpdate=true;}const n=new THREE.MeshLambertMaterial({map:o.map,toneMapped:false});n.userData.gt=1;n.onBeforeCompile=sh=>{sh.uniforms.GTK=GTKU;sh.fragmentShader='uniform float GTK;\n'+sh.fragmentShader;sh.fragmentShader=sh.fragmentShader.replace('#include <shadowmap_pars_fragment>','#include <shadowmap_pars_fragment>\n#include <shadowmask_pars_fragment>').replace('#include <opaque_fragment>','outgoingLight=diffuseColor.rgb*GTK*(0.5+0.5*getShadowMask());\n#include <opaque_fragment>');};m.material=n;m.receiveShadow=true;o.dispose();}});});
   const R=new THREE.Group();R.rotation.y=PI/2;R.add(t.group);GTG=new THREE.Group();GTG.add(R);GTG.scale.setScalar(10);GTG.position.set(WW/2,0,WH/2);
   const gz=parseFloat(new URLSearchParams(location.search).get('gz'));GTG.position.y=isNaN(gz)?220:gz;scene.add(GTG);
   let ok=false;t.addEventListener('load-tile-set',()=>{if(!ok){ok=true;gReady=true;for(const m of STATIC)m.visible=false;msg('Google 3D Tiles on');cam3.far=LOW?26000:60000;cam3.updateProjectionMatrix();scene.fog.near=LOW?2500:4000;scene.fog.far=LOW?24000:56000;setTimeout(buildCounty,50);}});
@@ -720,7 +737,7 @@ function render(){
  const bf=(W<H?74:58)-(AIM?12:0),tf=bf+clamp(sp/300,0,1)*12;if(Math.abs(cam3.fov-tf)>0.2){cam3.fov+=(tf-cam3.fov)*0.1;cam3.updateProjectionMatrix();}
  sun.target.position.set(Math.round(P.x/20)*20,py,Math.round(P.y/20)*20);sun.position.copy(sun.target.position).addScaledVector(SUNV,2000);
  if(GT){cam3.updateMatrixWorld();GT.update();if(time-gAttrT>2||time<gAttrT){gAttrT=time;const e=document.getElementById('gattr');if(e){const a=GT.getAttributions().filter(q=>q.type==='string').map(q=>q.value).join('; ');e.textContent='Google'+(a?' · '+a:'');}}}
- ren.render(scene,cam3);audioStep();
+ drawFrame();audioStep();
  g.setTransform(DPR,0,0,DPR,0,0);g.clearRect(0,0,W,H);
  if(rain){g.fillStyle='rgba(40,50,70,.16)';g.fillRect(0,0,W,H);g.strokeStyle='rgba(215,225,240,.4)';g.lineWidth=1;g.beginPath();for(let i=0;i<70;i++){const x=(h2(i,7)*W+time*90)%W,y=(h2(i,13)*H+time*(700+h2(i,3)*300))%H;g.moveTo(x,y);g.lineTo(x+3,y+14);}g.stroke();}
  if(P.flash>0){g.fillStyle='rgba(200,0,0,'+P.flash+')';g.fillRect(0,0,W,H);}
