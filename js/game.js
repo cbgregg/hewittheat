@@ -769,7 +769,7 @@ async function boot(){
  fb.addEventListener('pointerdown',e=>{fireHeld=true;e.preventDefault();});['pointerup','pointercancel','pointerleave'].forEach(n=>fb.addEventListener(n,()=>{fireHeld=false;}));
  ub.addEventListener('pointerdown',e=>{useBtn();e.preventDefault();});
  $('wpn').addEventListener('pointerdown',e=>{nextWeapon();e.preventDefault();});
- $('gon').addEventListener('click',()=>{const k=$('gkey').value.trim();if(k)enableGoogleTiles(k);});$('goff').addEventListener('click',disableGoogleTiles);
+ $('gon').addEventListener('click',()=>{const k=$('gkey').value.trim()||(location.hostname==='cbgregg.github.io'?'AIzaSyCMqLVWaLUmddEWfl7vAkAL26TbuepnMSw':'');if(k){$('gkey').value=k;enableGoogleTiles(k);}});$('goff').addEventListener('click',disableGoogleTiles);
  /* Built-in key: locked by Google to this site's address and to the Map Tiles API, so it is safe to ship. */
  try{const own=location.hostname==='cbgregg.github.io',k=localStorage.getItem('everett_gkey')||(own&&!localStorage.getItem('everett_goff')?'AIzaSyCMqLVWaLUmddEWfl7vAkAL26TbuepnMSw':'');if(k){$('gkey').value=k;enableGoogleTiles(k);}}catch(e){}
  $('mapb').addEventListener('click',toggleMap);$('resume').addEventListener('click',toggleMap);
