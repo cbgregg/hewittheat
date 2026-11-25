@@ -12,10 +12,17 @@ html,body{margin:0;height:100%;overflow:hidden;background:#101418;font-family:sy
 #use{right:104px;bottom:96px;border-color:#ffd23f}#jump{right:190px;bottom:44px;width:64px;height:64px;font-size:11px;border-color:#9fe0a0}#run{right:196px;bottom:118px;width:58px;height:58px;font-size:11px;border-color:#e8d24a}#wpn{right:26px;bottom:134px;width:58px;height:58px;font-size:11px;border-color:#9fd0ff}
 #mapb{position:fixed;left:12px;top:134px;padding:7px 12px;border-radius:8px;border:1px solid rgba(255,255,255,.5);background:rgba(15,20,28,.6);color:#fff;font:700 12px system-ui,sans-serif}
 .ov{position:fixed;inset:0;background:rgba(10,14,20,.93);display:flex;flex-direction:column;align-items:center;z-index:5;overflow:auto;-webkit-user-select:none}
-#intro{justify-content:center;text-align:center;padding:20px;box-sizing:border-box}
-#intro h1{font-size:44px;line-height:.95;margin:0;font-weight:900;letter-spacing:-.02em;color:#ffd23f;text-shadow:3px 3px 0 #b8322a}
-#intro h2{font-size:14px;letter-spacing:.3em;font-weight:700;margin:10px 0 22px;color:#9fc3d9}
-#intro table{border-collapse:collapse;font-size:13px;text-align:left;margin:0 auto 22px;max-width:420px}
+#intro{background:linear-gradient(90deg,rgba(6,9,13,.94) 0%,rgba(6,9,13,.78) 34%,rgba(6,9,13,.25) 62%,rgba(6,9,13,0) 100%);align-items:flex-start;justify-content:flex-start;text-align:left;padding:24px 6vw;box-sizing:border-box}
+#menu,#ctrl{max-width:440px;width:100%;margin:auto 0}
+#intro h1{font-size:clamp(46px,9vw,84px);line-height:.9;margin:0;font-weight:900;letter-spacing:-.03em;color:#ffd23f;text-shadow:4px 4px 0 #b8322a}
+#intro h2{font-size:13px;letter-spacing:.32em;font-weight:700;margin:12px 0 24px;color:#9fc3d9}
+.mb{display:block;width:100%;max-width:330px;margin:0 0 10px;padding:13px 18px;border-radius:9px;border:1px solid rgba(255,255,255,.35);background:rgba(15,20,28,.72);color:#fff;font:800 16px system-ui,sans-serif;letter-spacing:.06em;text-align:left}
+.mb.go{background:#ffd23f;color:#111;border:0;font-size:18px}.mb:disabled{opacity:.5}.mb:active{filter:brightness(1.25)}
+#stsub{font-size:12px;color:#40e0ff;margin:-4px 0 14px 2px;min-height:15px;font-weight:700}
+.fine{font-size:11px;color:#8ea6b5;margin:10px 0 0}
+body.cine .btn,body.cine #mapb,body.menu .btn,body.menu #mapb{display:none!important}
+@media (max-aspect-ratio:1/1){#intro{background:linear-gradient(180deg,rgba(6,9,13,.9) 0%,rgba(6,9,13,.6) 60%,rgba(6,9,13,.25) 100%)}}
+#intro table{border-collapse:collapse;font-size:13px;text-align:left;margin:0 0 18px;max-width:440px}
 #intro td{padding:5px 8px;border-bottom:1px solid rgba(255,255,255,.12);vertical-align:top}
 #intro td:first-child{color:#ffd23f;font-weight:700;white-space:nowrap}
 #start:disabled{opacity:.6}.go{padding:14px 34px;border-radius:10px;border:0;background:#ffd23f;color:#111;font:800 17px system-ui,sans-serif}
@@ -25,6 +32,7 @@ html,body{margin:0;height:100%;overflow:hidden;background:#101418;font-family:sy
 #mapc{width:1500px;max-width:none;display:block;margin:0 auto}
 #pdfmsg{font-size:12px;color:#9fc3d9;align-self:center}
 .leg{font-size:12px;color:#c9d3db;padding:0 12px 8px;text-align:center;flex:none}
+@media (max-height:470px){#intro{padding:10px 6vw}#intro h1{font-size:13vh;text-shadow:3px 3px 0 #b8322a}#intro h1 br{display:none}#intro h2{margin:6px 0 10px;font-size:11px}.mb{padding:8px 16px;margin-bottom:6px;font-size:14px}.mb.go{font-size:15px}#stsub{margin:-2px 0 8px 2px}.fine{margin-top:4px}#bld{margin-top:4px!important}}
 </style>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js" async></script>
 </head><body>
@@ -36,7 +44,16 @@ html,body{margin:0;height:100%;overflow:hidden;background:#101418;font-family:sy
 <button class="btn" id="run" style="display:none">RUN</button>
 <button id="mapb">MAP</button>
 <div class="ov" id="intro">
-<h1>HEWITT<br>HEAT</h1><h2>DOWNTOWN EVERETT</h2>
+<div id="menu">
+<h1>HEWITT<br> HEAT</h1><h2>EVERETT &middot; SNOHOMISH COUNTY</h2>
+<button class="go mb" id="start">START</button>
+<div id="stsub"></div>
+<button class="mb" id="newstory" style="display:none" disabled>NEW STORY</button>
+<button class="mb" id="freeplay" disabled>FREE PLAY</button>
+<button class="mb" id="ctrlb" disabled>CONTROLS</button>
+<p class="fine">Story characters are fictional. Best in landscape with sound on.</p>
+</div>
+<div id="ctrl" style="display:none">
 <table>
 <tr><td>Controller</td><td>Left stick move/steer &middot; right stick camera &middot; RT gas or fire &middot; LT brake or aim &middot; A sprint/handbrake &middot; X jump &middot; Y enter/exit &middot; LB/RB weapon &middot; Start map</td></tr>
 <tr><td>Keyboard</td><td>WASD &middot; mouse look (click to lock) &middot; Shift sprint &middot; Space jump/handbrake &middot; left click fire &middot; right click aim &middot; E enter &middot; Q weapon &middot; C look back &middot; M map</td></tr>
@@ -45,11 +62,11 @@ html,body{margin:0;height:100%;overflow:hidden;background:#101418;font-family:sy
 <tr><td>Jobs</td><td>Courier at Everett Station &middot; car export at the Port &middot; street race at the Arena &middot; steal a taxi or bus for shifts</td></tr>
 <tr><td>Also</td><td>25 hidden packages &middot; body shop on Broadway &middot; Guns &amp; Ammo on Hewitt &middot; heal at Providence</td></tr>
 </table>
-<p style="font-size:12px;color:#9fc3d9;margin:-8px 0 18px">Best in landscape with sound on. Real streets, building footprints and hills from City of Everett GIS.</p>
-<button class="go" id="start">START</button>
+<button class="mb" id="ctrlx">BACK</button>
+</div>
 </div>
 <div class="ov" id="mapov" style="display:none">
-<div class="bar"><button id="resume">Resume</button><button id="pdf" style="display:none">Save as PDF</button><button id="snd">Sound: on</button><button id="newgame">New game</button><span id="pdfmsg"></span></div>
+<div class="bar"><button id="resume">Resume</button><button id="pdf" style="display:none">Save as PDF</button><button id="snd">Sound: on</button><button id="tomenu">Main menu</button><button id="newgame">New game</button><span id="pdfmsg"></span></div>
 <div class="leg">Red = you &middot; Yellow = jobs &middot; Pink = race &middot; Orange = body shop &middot; Green = ammo &middot; Cyan = packages &middot; <span id="pkc"></span></div>
 <div class="bar" style="padding-top:0"><input id="gkey" placeholder="Google Map Tiles API key" autocomplete="off" style="padding:9px;border-radius:8px;border:1px solid #556;background:#111820;color:#fff;font-size:13px;width:230px"><button id="gon">Use Google 3D</button><button id="goff">Off</button><span id="gmsg" style="font-size:12px;color:#9fc3d9;align-self:center"></span></div>
 <div class="bar" style="padding-top:0"><select id="trav" style="padding:9px;border-radius:8px;border:1px solid #556;background:#111820;color:#fff;font-size:13px;max-width:230px"><option value="">Travel in Snohomish County…</option><option value="__home">Downtown Everett (home)</option></select><button id="travgo">Go</button><span style="font-size:12px;color:#9fc3d9;align-self:center">Needs Google 3D on. Or just drive off the edge of the map.</span></div>
