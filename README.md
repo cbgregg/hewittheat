@@ -35,7 +35,7 @@ Restrict the key to this site's referrer and to the Map Tiles API. Append `?gz=<
 
 ## Story
 
-The seven story chapters are fiction. Every character, company and radio broadcast in them is invented and none of them depicts a real person. The city issues the story plays with (library hours, the downtown ballpark budget, historic buildings left to decay, license plate cameras) are real topics in Everett.
+The story is a seven-chapter screenplay (data/story.json): 114 voiced lines, dialogue scenes cut with wide, over-the-shoulder, close-up and low-angle shots, radio chatter during missions, a prologue and an epilogue. It is fiction. Every character, company and radio broadcast in them is invented and none of them depicts a real person. The city issues the story plays with (library hours, the downtown ballpark budget, historic buildings left to decay, license plate cameras) are real topics in Everett.
 
 ## Sketchfab models (CC BY 4.0)
 
