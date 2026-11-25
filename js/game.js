@@ -633,7 +633,7 @@ function init3D(){
 function initMarkers(){GV.forEach((gv,i)=>MK['g'+i]=mkMarker(gv.type==='race'?'#ff5ad0':'#ffd23f',gv.type==='courier'?'COURIER':gv.type==='race'?'RACE':'EXPORT'));PKG.forEach(p=>{p.m=box(9,9,9,0,0,0,0,null,bmat('#40e0ff'));p.m.castShadow=false;scene.add(p.m);});
  MK.shop=mkMarker('#ff8a30','BODY SHOP');MK.pawn=mkMarker('#7ad06a','AMMO');MK.hosp=mkMarker('#ff5a6a','HEAL');MK.tgt=mkMarker('#ffe45a','▼');MK.story=mkMarker('#40e0ff','STORY');}
 /* --- optional: Google Photorealistic 3D Tiles. Needs the player's own Map Tiles API key and a normal web host (blocked inside the Claude artifact). --- */
-let GT=null,GTG=null,gAttrT=0,gReady=false,rayBudget=0,gDt=0.016,CW=null,COUNTY=null;const STATIC=[];
+const BUILD='Nov 24 6:45pm';let GT=null,GTG=null,gAttrT=0,gReady=false,rayBudget=0,gDt=0.016,CW=null,COUNTY=null;const STATIC=[];
 /* ---------- Google ground: with 3D Tiles on, heights come from the photogrammetry mesh, so bridges, ramps and underpasses work, and the world continues past the downtown map ---------- */
 const RC=new THREE.Raycaster(),RDN=new THREE.Vector3(0,-1,0),RO=new THREE.Vector3(),RDIR=new THREE.Vector3();
 const OOB=(x,y)=>x<0||y<0||x>=WW||y>=WH;
@@ -683,7 +683,7 @@ async function enableGoogleTiles(key){const msg=t=>{const e=document.getElementB
   const R=new THREE.Group();R.rotation.y=PI/2;R.add(t.group);GTG=new THREE.Group();GTG.add(R);GTG.scale.setScalar(10);GTG.position.set(WW/2,0,WH/2);
   const gz=parseFloat(new URLSearchParams(location.search).get('gz'));GTG.position.y=isNaN(gz)?220:gz;scene.add(GTG);
   let ok=false;t.addEventListener('load-tile-set',()=>{if(!ok){ok=true;gReady=true;for(const m of STATIC)m.visible=false;msg('Google 3D Tiles on');cam3.far=LOW?26000:60000;cam3.updateProjectionMatrix();scene.fog.near=LOW?2500:4000;scene.fog.far=LOW?24000:56000;setTimeout(buildCounty,50);}});
-  t.addEventListener('load-error',e=>{if(!ok)msg('Google tiles failed to load. Check the key, that Map Tiles API is enabled, and the referrer restriction.');});
+  t.addEventListener('load-error',e=>{if(!ok)msg('Google refused the key on this device. On iPhone the key must allow https://cbgregg.github.io/* (see chat).');});
   GT=t;try{localStorage.setItem('everett_gkey',key);localStorage.removeItem('everett_goff');}catch(e){}
  }catch(e){console.warn(e);msg('Google 3D Tiles are not available here: '+(e&&e.message||e));}}
 function disableGoogleTiles(){try{localStorage.removeItem('everett_gkey');localStorage.setItem('everett_goff','1');}catch(e){}if(GT){scene.remove(GTG);GT.dispose();GT=null;gReady=false;for(const m of STATIC)m.visible=true;cam3.far=LOW?5600:7400;cam3.updateProjectionMatrix();scene.fog.near=1800;scene.fog.far=LOW?5200:7000;if(OOB(P.x,P.y))travel('__home');for(const c of cars)if(OOB(c.x,c.y)){c.gone=true;c.keep=false;}}const e=document.getElementById('gattr');if(e)e.textContent='';const g2=document.getElementById('gmsg');if(g2)g2.textContent='Google 3D Tiles off';}
@@ -809,7 +809,8 @@ async function boot(){
  fb.addEventListener('pointerdown',e=>{fireHeld=true;e.preventDefault();});['pointerup','pointercancel','pointerleave'].forEach(n=>fb.addEventListener(n,()=>{fireHeld=false;}));
  ub.addEventListener('pointerdown',e=>{useBtn();e.preventDefault();});
  $('wpn').addEventListener('pointerdown',e=>{nextWeapon();e.preventDefault();});
- $('gon').addEventListener('click',()=>{const k=$('gkey').value.trim()||(location.hostname==='cbgregg.github.io'?'AIzaSyCMqLVWaLUmddEWfl7vAkAL26TbuepnMSw':'');if(k){$('gkey').value=k;enableGoogleTiles(k);}});$('goff').addEventListener('click',disableGoogleTiles);$('travgo').addEventListener('click',()=>{const v=$('trav').value;if(v&&travel(v))toggleMap();});
+ $('gon').addEventListener('click',()=>{const k=$('gkey').value.trim()||(location.hostname==='cbgregg.github.io'?'AIzaSyCMqLVWaLUmddEWfl7vAkAL26TbuepnMSw':'');if(k){$('gkey').value=k;enableGoogleTiles(k);}});$('goff').addEventListener('click',disableGoogleTiles);if($('travgo'))$('travgo').addEventListener('click',()=>{const v=$('trav').value;if(v&&travel(v))toggleMap();});
+ {const b=document.createElement('div');b.id='bld';b.style.cssText='font-size:11px;color:#7f97a6;margin-top:14px';$('intro').appendChild(b);setInterval(()=>{b.textContent='Build '+BUILD+' · Google 3D: '+(GT&&gReady?'ON (bridges, freeway and county travel active)':GT?'loading…':'OFF (downtown only)');},500);}
  /* Built-in key: locked by Google to this site's address and to the Map Tiles API, so it is safe to ship. */
  try{const own=location.hostname==='cbgregg.github.io',k=localStorage.getItem('everett_gkey')||(own&&!localStorage.getItem('everett_goff')?'AIzaSyCMqLVWaLUmddEWfl7vAkAL26TbuepnMSw':'');if(k){$('gkey').value=k;enableGoogleTiles(k);}}catch(e){}
  $('mapb').addEventListener('click',toggleMap);$('resume').addEventListener('click',toggleMap);

@@ -57,5 +57,5 @@ html,body{margin:0;height:100%;overflow:hidden;background:#101418;font-family:sy
 </div>
 <script>window.EV_NOAIR=1</script>
 <script type="importmap">{"imports":{"three":"./lib/three/build/three.module.min.js","three/addons/":"./lib/three/examples/jsm/","three/examples/jsm/":"./lib/three/examples/jsm/"}}</script>
-<script type="module" src="js/game.js"></script>
+<script type="module">import("./js/game.js?t="+Math.floor(Date.now()/60000));</script>
 </body></html>
