@@ -30,8 +30,9 @@ function streetAt(x,y){const cx=Math.floor(x/600),cy=Math.floor(y/600);let bn=nu
 function xnode(n1,n2){for(let i=0;i<nodes.length;i++){const s=new Set(nodes[i].nb.map(k=>edges.get(i*65536+k).name));if(s.has(n1)&&s.has(n2))return i;}return -1;}
 async function loadImg(src){const im=new Image();im.src=src;await im.decode();return im;}
 function pixels(im){const c=document.createElement('canvas');c.width=im.naturalWidth;c.height=im.naturalHeight;const x=c.getContext('2d',{willReadFrequently:true});x.drawImage(im,0,0);return x.getImageData(0,0,c.width,c.height).data;}
+let CITY=null,DBGC=null;
 async function loadWorld(){
- WORLD=await (await fetch('data/world.json')).json();MW=WORLD.mw;MH=WORLD.mh;WW=MW*T;WH=MH*T;
+ WORLD=await (await fetch('data/world.json')).json();try{CITY=(await new GLTFLoader().loadAsync('data/city.glb')).scene;}catch(e){console.warn('city model unavailable, using generated buildings',e);CITY=null;}MW=WORLD.mw;MH=WORLD.mh;WW=MW*T;WH=MH*T;
  const md=pixels(await loadImg('data/map.png'));map=new Uint8Array(MW*MH);for(let i=0;i<MW*MH;i++)map[i]=Math.round(md[i*4]/30);
  const hd=pixels(await loadImg('data/hm.png'));gw=WORLD.gw;gh=WORLD.gh;GS=WORLD.gs*10;HMAP=new Float32Array(gw*gh);for(let i=0;i<gw*gh;i++)HMAP[i]=((hd[i*4]<<8)|hd[i*4+1])-1000;
  if(window.EV_NOAIR)AIRIMG=[null,null,null,null,null,null];else{for(let ty=0;ty<2;ty++)for(let tx=0;tx<3;tx++)AIRIMG.push(loadImg('data/airlo_'+tx+'_'+ty+'.jpg').catch(()=>null));AIRIMG=await Promise.all(AIRIMG);}
@@ -564,7 +565,7 @@ function buildStatic2(){
  // buildings: real footprints, estimated heights
  const cells=new Map(),cellOf=(x,y,k)=>{const key=Math.floor(x/3200)+','+Math.floor(y/3200)+'|'+k;let b=cells.get(key);if(!b){b=B_();b.k=k;cells.set(key,b);}return b;};
  const FS=[[92,72],[112,72],[82,76],[82,150],[92,170]],HW=HWALL.map(hex),W1=[1,1,1],IND=[hex('#9aa0a6'),hex('#b9b3a4'),hex('#7f8a93'),hex('#a89a86')],V2=[];
- for(const bd of WORLD.bld){const h=bd[0],kind=bd[1],st=bd[2],n=(bd.length-3)/2;let cx=0,cy=0,lo=1e9,hi=-1e9;const px=[],py=[];
+ for(const bd of (CITY?[]:WORLD.bld)){const h=bd[0],kind=bd[1],st=bd[2],n=(bd.length-3)/2;let cx=0,cy=0,lo=1e9,hi=-1e9;const px=[],py=[];
   for(let i=0;i<n;i++){const x=bd[3+i*2],y=bd[4+i*2];px.push(x);py.push(y);cx+=x;cy+=y;const e=Hat(x,y);if(e<lo)lo=e;if(e>hi)hi=e;}cx/=n;cy/=n;
   const base=lo-4,top=(lo+hi)/2+h,hs=h2(px[0]|0,py[0]|0),key=(kind===0||kind===3)?'house':kind===4?'ind':'f'+st,wb=cellOf(cx,cy,key);
   const col=kind===0?HW[(hs*8)|0]:kind===3?mul(HW[(hs*8)|0],0.75):kind===4?IND[(hs*4)|0]:mul(W1,0.9+hs*0.2),U=key==='house'?46:key==='ind'?40:FS[st][0],V=key==='house'?30:key==='ind'?60:FS[st][1];
@@ -592,6 +593,7 @@ function buildStatic2(){
  const ic=document.createElement('canvas');ic.width=64;ic.height=64;{const x=ic.getContext('2d');x.fillStyle='#e9e9e6';x.fillRect(0,0,64,64);for(let i=0;i<64;i+=4){x.fillStyle=i%8?'rgba(0,0,0,.10)':'rgba(255,255,255,.25)';x.fillRect(i,0,2,64);}x.fillStyle='rgba(0,0,0,.18)';x.fillRect(0,60,64,4);}
  const it=new THREE.CanvasTexture(ic);it.wrapS=it.wrapT=THREE.RepeatWrapping;it.colorSpace=THREE.SRGBColorSpace;it.anisotropy=4;MAT.house=S({map:ht});MAT.ind=S({map:it});MAT.shop=S({map:ltex('data/shop.jpg',1)});for(let i=0;i<5;i++)MAT['f'+i]=S({map:ltex('data/f'+i+'.jpg',1)});for(let i=0;i<6;i++)MAT['roof'+i]=roofM[i];
  cells.forEach(b=>{if(!b.p.length)return;const m=new THREE.Mesh(geoOf(b),MAT[b.k]);m.castShadow=true;m.receiveShadow=true;scene.add(m);});
+ if(CITY){CITY.traverse(o=>{if(o.isMesh){o.castShadow=true;o.receiveShadow=true;const m=o.material;m.metalness=0;m.roughness=/glass/.test(m.name)?0.35:0.86;if(m.map)m.map.anisotropy=LOW?4:8;}});scene.add(CITY);}
  // trees (parks, plus a thin scatter on open grass)
  const M4=()=>new THREE.Matrix4(),Q=new THREE.Quaternion(),UP=new THREE.Vector3(0,1,0),tb=B_(),gc=hex('#2f5a34'),tc=hex('#4a3526');
  cube(tb,0,12,0,4,24,4,tc);for(let k=0;k<3;k++){const y0=18+k*24,ss=26*(1-k*0.27),tp=[0,k===2?110:y0+46,0],c4=[[-ss,y0,-ss],[-ss,y0,ss],[ss,y0,ss],[ss,y0,-ss]];for(let q=0;q<4;q++)tri(tb,c4[q],c4[(q+1)%4],tp,mul(gc,(q%2?1:0.82)*(1-k*0.05)));}
@@ -785,7 +787,7 @@ async function enableGoogleTiles(key){const msg=t=>{const e=document.getElementB
   t.addEventListener('load-error',e=>{if(!ok)msg('Google refused the key on this device. On iPhone the key must allow https://cbgregg.github.io/* (see chat).');});
   GT=t;try{localStorage.setItem('everett_gkey',key);localStorage.removeItem('everett_goff');}catch(e){}
  }catch(e){console.warn(e);msg('Google 3D Tiles are not available here: '+(e&&e.message||e));}}
-function disableGoogleTiles(){try{localStorage.removeItem('everett_gkey');localStorage.setItem('everett_goff','1');}catch(e){}if(GT){scene.remove(GTG);GT.dispose();GT=null;gReady=false;for(const m of STATIC)m.visible=true;cam3.far=LOW?5600:7400;cam3.updateProjectionMatrix();scene.fog.near=1800;scene.fog.far=LOW?5200:7000;if(OOB(P.x,P.y))travel('__home');for(const c of cars)if(OOB(c.x,c.y)){c.gone=true;c.keep=false;}}const e=document.getElementById('gattr');if(e)e.textContent='';const g2=document.getElementById('gmsg');if(g2)g2.textContent='Google 3D Tiles off';}
+function disableGoogleTiles(){try{localStorage.removeItem('everett_gon2');localStorage.removeItem('everett_gkey');localStorage.setItem('everett_goff','1');}catch(e){}if(GT){scene.remove(GTG);GT.dispose();GT=null;gReady=false;for(const m of STATIC)m.visible=true;cam3.far=LOW?5600:7400;cam3.updateProjectionMatrix();scene.fog.near=1800;scene.fog.far=LOW?5200:7000;if(OOB(P.x,P.y))travel('__home');for(const c of cars)if(OOB(c.x,c.y)){c.gone=true;c.keep=false;}}const e=document.getElementById('gattr');if(e)e.textContent='';const g2=document.getElementById('gmsg');if(g2)g2.textContent='Google 3D Tiles off';}
 const sigState=v=>{const ph=time%18,vg=ph>=9,yl=(ph%9)>7.3;return v===vg?(yl?1:2):0;};
 const SUNV=new THREE.Vector3(-0.45,0.78,0.42).normalize();
 function render(){
@@ -815,7 +817,7 @@ function render(){
  const pg=P.car?gY(P.car,true):gY(P,true);if(P.car){P.gy=P.car.gy;P.gt=P.car.gt;P.gyr=pg;P.gl=pg;}else P.gl=pg;gBump();
  const py=pg+(P.car?0:(P.z||0)*0.6),cxp=P.x-Math.cos(cy)*camD*cp-Math.sin(cy)*sh+sx,czp=P.y-Math.sin(cy)*camD*cp+Math.cos(cy)*sh;
  cam3.position.set(cxp,Math.max(py+Hc+camD*sn+(Dw-camD)*0.35+sx,(GT&&gReady?py:Hat(cxp,czp))+7),czp);
- const lf=AIM?90:38;if(MENU)CAMO=menuCam();if(CAMO){cam3.position.set(CAMO[0],CAMO[1],CAMO[2]);cam3.lookAt(CAMO[3],CAMO[4],CAMO[5]);}else cam3.lookAt(P.x+Math.cos(cy)*lf-Math.sin(cy)*sh,py+Hc-(AIM?0:2)-sn*lf*0.25,P.y+Math.sin(cy)*lf+Math.cos(cy)*sh);
+ const lf=AIM?90:38;if(MENU)CAMO=menuCam();if(DBGC)CAMO=DBGC;if(CAMO){cam3.position.set(CAMO[0],CAMO[1],CAMO[2]);cam3.lookAt(CAMO[3],CAMO[4],CAMO[5]);}else cam3.lookAt(P.x+Math.cos(cy)*lf-Math.sin(cy)*sh,py+Hc-(AIM?0:2)-sn*lf*0.25,P.y+Math.sin(cy)*lf+Math.cos(cy)*sh);
  const bf=(W<H?74:58)-(AIM?12:0),cf=CAMO&&!MENU?(CAMO[6]||42)*(W<H?1.5:1):0,tf=cf||bf+clamp(sp/300,0,1)*12;if(Math.abs(cam3.fov-tf)>0.2){cam3.fov=cf?tf:cam3.fov+(tf-cam3.fov)*0.1;cam3.updateProjectionMatrix();}
  sun.target.position.set(Math.round(P.x/20)*20,py,Math.round(P.y/20)*20);sun.position.copy(sun.target.position).addScaledVector(SUNV,2000);
  if(GT){cam3.updateMatrixWorld();GT.update();if(time-gAttrT>2||time<gAttrT){gAttrT=time;const e=document.getElementById('gattr');if(e){const a=GT.getAttributions().filter(q=>q.type==='string').map(q=>q.value).join('; ');e.textContent='Google'+(a?' · '+a:'');}}}
@@ -909,10 +911,10 @@ async function boot(){
  fb.addEventListener('pointerdown',e=>{fireHeld=true;e.preventDefault();});['pointerup','pointercancel','pointerleave'].forEach(n=>fb.addEventListener(n,()=>{fireHeld=false;}));
  ub.addEventListener('pointerdown',e=>{useBtn();e.preventDefault();});
  $('wpn').addEventListener('pointerdown',e=>{nextWeapon();e.preventDefault();});
- $('gon').addEventListener('click',()=>{const k=$('gkey').value.trim()||(location.hostname==='cbgregg.github.io'?'AIzaSyCMqLVWaLUmddEWfl7vAkAL26TbuepnMSw':'');if(k){$('gkey').value=k;enableGoogleTiles(k);}});$('goff').addEventListener('click',disableGoogleTiles);if($('travgo'))$('travgo').addEventListener('click',()=>{const v=$('trav').value;if(v&&travel(v))toggleMap();});
+ $('gon').addEventListener('click',()=>{const k=$('gkey').value.trim()||(location.hostname==='cbgregg.github.io'?'AIzaSyCMqLVWaLUmddEWfl7vAkAL26TbuepnMSw':'');if(k){$('gkey').value=k;try{localStorage.setItem('everett_gon2','1');}catch(e){}enableGoogleTiles(k);}});$('goff').addEventListener('click',disableGoogleTiles);if($('travgo'))$('travgo').addEventListener('click',()=>{const v=$('trav').value;if(v&&travel(v))toggleMap();});
  {const b=document.createElement('div');b.id='bld';b.style.cssText='font-size:11px;color:#7f97a6;margin-top:14px';$('intro').appendChild(b);setInterval(()=>{b.textContent='Build '+BUILD+' · Google 3D: '+(GT&&gReady?'ON (bridges, freeway and county travel active)':GT?'loading…':'OFF (downtown only)');},500);}
  /* Built-in key: locked by Google to this site's address and to the Map Tiles API, so it is safe to ship. */
- try{const own=location.hostname==='cbgregg.github.io',k=localStorage.getItem('everett_gkey')||(own&&!localStorage.getItem('everett_goff')?'AIzaSyCMqLVWaLUmddEWfl7vAkAL26TbuepnMSw':'');if(k){$('gkey').value=k;enableGoogleTiles(k);}}catch(e){}
+ try{const own=location.hostname==='cbgregg.github.io',k=localStorage.getItem('everett_gon2')?(localStorage.getItem('everett_gkey')||(own?'AIzaSyCMqLVWaLUmddEWfl7vAkAL26TbuepnMSw':'')):'';if(k){$('gkey').value=k;enableGoogleTiles(k);}}catch(e){}
  $('mapb').addEventListener('click',toggleMap);$('resume').addEventListener('click',toggleMap);
  $('start').addEventListener('click',()=>startStoryMode(false));if($('newstory'))$('newstory').addEventListener('click',()=>startStoryMode(true));if($('freeplay'))$('freeplay').addEventListener('click',startFree);
  if($('ctrlb'))$('ctrlb').addEventListener('click',()=>{$('menu').style.display='none';$('ctrl').style.display='block';});if($('ctrlx'))$('ctrlx').addEventListener('click',()=>{$('ctrl').style.display='none';$('menu').style.display='';});if($('tomenu'))$('tomenu').addEventListener('click',toMenu);
@@ -939,5 +941,5 @@ function toggleMap(){const o=document.getElementById('mapov');if(document.getEle
   {const cm=document.getElementById('cmap');if(cm){buildCounty();cm.style.display=CW?'block':'none';if(CW)drawCountyMap(cm);}}
   document.getElementById('pkc').textContent='Packages '+Object.keys(pkgGot).length+'/'+PKG.length;
   const w=document.getElementById('mapwrap');w.scrollLeft=P.x/WW*c.clientWidth-w.clientWidth/2;{const cm=document.getElementById('cmap'),ch=cm&&cm.style.display!=='none'?cm.clientHeight+12:0;w.scrollTop=OOB(P.x,P.y)?0:ch+P.y/WH*c.clientHeight-w.clientHeight/2;}}}
-window.G={gtStats:()=>GT&&GT.stats,boot,update,render,P,nextWeapon,makePed,get GV(){return GV;},nodes,get LM(){return LM;},get map(){return map;},Hat,get STOPS(){return STOPS;},get SPOTS(){return SPOTS;},makeCar,tileAt,get cars(){return cars;},get peds(){return peds;},useBtn,crime,startMission,setPaused:v=>paused=v,shoot,tile,solidAt,get M(){return M;},get stars(){return stars;},VSPEC,GUN,SND,get STORY(){return STORY;},get ST(){return ST;},set ST(v){ST=v;syncStoryPed();},get CONTACTS(){return CONTACTS;},setPts:v=>{pts=v;cool=0;},lm,missionStep,travel,startStoryMode,startFree,toMenu,get CUT(){return CUT;},get MODE(){return MODE;},get MENU(){return MENU;},skip:()=>{skipTap=true;},OOB,get CW(){return CW;},get gReady(){return gReady;},gCast};
+window.G={cam:v=>{DBGC=v;if(!v)CAMO=null;},gtStats:()=>GT&&GT.stats,boot,update,render,P,nextWeapon,makePed,get GV(){return GV;},nodes,get LM(){return LM;},get map(){return map;},Hat,get STOPS(){return STOPS;},get SPOTS(){return SPOTS;},makeCar,tileAt,get cars(){return cars;},get peds(){return peds;},useBtn,crime,startMission,setPaused:v=>paused=v,shoot,tile,solidAt,get M(){return M;},get stars(){return stars;},VSPEC,GUN,SND,get STORY(){return STORY;},get ST(){return ST;},set ST(v){ST=v;syncStoryPed();},get CONTACTS(){return CONTACTS;},setPts:v=>{pts=v;cool=0;},lm,missionStep,travel,startStoryMode,startFree,toMenu,get CUT(){return CUT;},get MODE(){return MODE;},get MENU(){return MENU;},skip:()=>{skipTap=true;},OOB,get CW(){return CW;},get gReady(){return gReady;},gCast};
 boot();

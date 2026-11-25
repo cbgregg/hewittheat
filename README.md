@@ -63,3 +63,22 @@ Voice lines and sound effects were generated with ElevenLabs, using stock librar
 ## Beyond downtown
 
 With Google 3D Tiles on, ground height comes from the Google mesh, so ramps, bridge decks and underpasses are driveable and the world continues past the edge of the downtown map. The MAP screen has a travel menu for Snohomish County towns. County boundary, highways and place names: U.S. Census Bureau TIGER/Line (public domain).
+
+## Built city model
+
+Downtown no longer depends on Google 3D Tiles or aerial photos. Google tiles are off unless the player presses "Use Google 3D" in the MAP screen.
+
+- `data/city.glb`: all 6,399 City of Everett footprints as one textured model (walls snapped to whole window bays and floors, storefront ground floors, parapets, rooftop units, hip roofs on houses, the port dome, the county parking garage).
+- `tex/b/`: 21 materials (brick, glass, concrete, panel, siding, storefronts, roofs). Each one is modelled as geometry and rendered in Blender Cycles. None is a photograph.
+- Materials and colours per building follow reference notes taken from flyover video of downtown. No imagery from Google or Apple is used in any asset.
+- If `data/city.glb` fails to load, the game falls back to its generated buildings.
+
+Rebuild:
+
+```bash
+pip install bpy pillow
+python3 tools/textures.py tex/b                 # render the material set in Blender
+python3 tools/citygen.py . data/city.glb quant  # build the game model
+python3 tools/citygen.py . /tmp/stage/data/city_full.glb   # full-precision copy for Blender (textures in /tmp/stage/tex/b)
+python3 tools/render_city.py /tmp/stage/data/city_full.glb . renders   # Blender stills
+```
