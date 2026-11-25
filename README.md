@@ -82,3 +82,25 @@ python3 tools/citygen.py . data/city.glb quant  # build the game model
 python3 tools/citygen.py . /tmp/stage/data/city_full.glb   # full-precision copy for Blender (textures in /tmp/stage/tex/b)
 python3 tools/render_city.py /tmp/stage/data/city_full.glb . renders   # Blender stills
 ```
+
+## Street props and people
+
+The box placeholders for street lamps, signals, bus stops and trees are replaced with instanced models, and hydrants, picnic tables and trash barrels are added along streets and at bus stops. Two Mixamo-rigged civilians replace the placeholder figure and share the existing Idle / Walk / Run clips. If a model fails to load the game falls back to the old shapes.
+
+All from Sketchfab under CC BY 4.0, modified for the game (re-based, scaled, textures reduced; people: bones renamed to the Mixamo standard, outfit split into shirt and pants):
+
+| Model | Author |
+|---|---|
+| Street lamp (low poly) | pinokio21 |
+| Traffic Light | Pieter Ferreira |
+| Bus Stop Shelter | R3indeer |
+| Lowpoly Tree | dionne |
+| Stylized Pine Tree Tree | Batuhan13 |
+| Fire Hydrant [Low Poly] | Islide |
+| Low-Poly Wooden Bench | Memorie |
+| Photorealistic Trash Can (LOW POLY) | Derfmode |
+| Low Poly Male, Low Poly Female | Loves_Art |
+
+`tools/sketchfab_dl.py` and `tools/sketchfab_prep.py` rebuild them; the Sketchfab token is read from the `SKF` environment variable and is not stored in this repository.
+
+Shadows use a 4096 map on desktop, and window glass on the building materials picks up sun glints.
