@@ -546,6 +546,8 @@ function airMat(tex,U){const m=new THREE.MeshStandardMaterial({map:tex,roughness
    c=mix(c,asp*1.5*mix(1.0,far*5.0,0.3)*mix(1.0,al*4.0,0.22),road);
    float edge=smoothstep(0.25,0.5,mk.r)*(1.0-smoothstep(0.5,0.78,mk.r));c*=1.0-edge*0.5;
    c=mix(c,vec3(0.72,0.52,0.08),smoothstep(0.5,0.72,mk.b)*road);
+   {float lot=smoothstep(0.5,0.72,mk.b)*(1.0-road)*(1.0-walk);vec2 pq=vGP/vec2(26.0,170.0);float pv=fract(pq.y),stall=step(pv,0.31)+step(0.69,pv),fw=fwidth(pq.x)+1e-5,ln=stall*smoothstep(0.47-fw,0.47+fw,abs(fract(pq.x)-0.5))*clamp(0.05/fw,0.0,1.0);
+    c=mix(c,vec3(dot(asp,vec3(0.333)))*vec3(1.08,1.12,1.2)*mix(1.0,far*5.0,0.3),lot*0.9);c=mix(c,vec3(0.74),lot*ln*0.8);}
    diffuseColor.rgb=c;}`);};
  return m;}
 function inst(geo,mat,mats,cast){const im=new THREE.InstancedMesh(geo,mat,mats.length);mats.forEach((m,k)=>im.setMatrixAt(k,m));im.castShadow=!!cast;im.receiveShadow=true;im.frustumCulled=false;scene.add(im);return im;}

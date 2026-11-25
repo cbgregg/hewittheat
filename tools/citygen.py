@@ -396,6 +396,15 @@ for i, b in enumerate(BLD):
         if par:
             pc = tuple(v * 0.6 for v in lin('#c9c7c1'))
             BF.quad(plain, (a[0], rt, a[1]), (c[0], rt, c[1]), (c[0], wt, c[1]), (a[0], wt, a[1]), (0, 0, 1, 1), pc)
+            if wm in ('f_brick_red', 'f_brick_buff', 'f_brick_dark', 'f_concrete') and h > 60 and ln > 20:
+                # projecting cornice: soffit, face and cap
+                ox_, oy_ = (py[j] - py[k]) / ln * 3.5, -(px[j] - px[k]) / ln * 3.5
+                cc = tuple(v * 0.62 for v in lin('#3a3532' if wm == 'f_brick_dark' else '#d6cfbf'))
+                A0, C0 = (a[0] + ox_, a[1] + oy_), (c[0] + ox_, c[1] + oy_)
+                z0c, z1c = wt - 5, wt + 1.5
+                BF.quad(plain, (a[0], z0c, a[1]), (c[0], z0c, c[1]), (C0[0], z0c, C0[1]), (A0[0], z0c, A0[1]), (0, 0, 1, 1), tuple(v * 0.6 for v in cc))
+                BF.quad(plain, (A0[0], z0c, A0[1]), (C0[0], z0c, C0[1]), (C0[0], z1c, C0[1]), (A0[0], z1c, A0[1]), (0, 0, 1, 1), cc)
+                BF.quad(plain, (A0[0], z1c, A0[1]), (C0[0], z1c, C0[1]), (c[0], z1c, c[1]), (a[0], z1c, a[1]), (0, 0, 1, 1), tuple(min(1, v * 1.25) for v in cc))
     RBf = BF.get(cx, cy, L['roof'])
     rc = L['rtint']
     if pitched:
@@ -418,6 +427,10 @@ for i, b in enumerate(BLD):
                 T = [(vi, vj, E[b_]), (vi, E[b_], E[a_])]
             for t in T:
                 BF.tri(RBf, t, [ruv(p) for p in t], rc)
+        if kind == 0 and rise > 9 and r.random() < 0.6:
+            f = r.choice([0.25, 0.7])
+            qx, qy = RA[0] + (RB[0] - RA[0]) * f - dy * 9, RA[1] + (RB[1] - RA[1]) * f + dx * 9
+            BF.box(plain, qx, wt + rise - 14, qy, 6, 24, 6, lin(r.choice(['#7a4034', '#8a5a48', '#9a9c9e'])), math.atan2(dy, dx))
     else:
         tr = earclip(px, py)
         if L['roof'] == 'r_parking':
@@ -446,6 +459,9 @@ for i, b in enumerate(BLD):
                 e = math.atan2(py[1] - py[0], px[1] - px[0])
                 BF.box(plain, x, rt, y, r.uniform(18, 38), r.uniform(10, 17), r.uniform(14, 28), lin(r.choice(['#b9bcc0', '#8d9196', '#d0d2d4'])), e)
                 placed += 1
+            if h > 230 and pip(cx, cy, px, py):
+                BF.box(plain, cx, rt, cy, 2.5, 90, 2.5, lin('#d0d2d4'))
+                BF.box(plain, cx, rt + 60, cy, 14, 1.5, 1.5, lin('#d0d2d4'))
             if h > 150 and A > 30000:
                 for _ in range(40):
                     x, y = r.uniform(x0, x1), r.uniform(y0, y1)

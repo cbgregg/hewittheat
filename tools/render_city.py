@@ -97,6 +97,15 @@ walk = step(sep.outputs[1], 0.70, 0.86)
 urb = step(sep.outputs[1], 0.25, 0.42)
 c = mix(urb, (0.085, 0.13, 0.05, 1), (0.25, 0.25, 0.245, 1))      # grass -> paved lot
 c = mix(walk, c, (0.52, 0.52, 0.50, 1))                           # sidewalks
+lotf = nt.nodes.new('ShaderNodeMath')
+lotf.operation = 'MULTIPLY'
+inv = nt.nodes.new('ShaderNodeMath')
+inv.operation = 'SUBTRACT'
+inv.inputs[0].default_value = 1.0
+nt.links.new(road, inv.inputs[1])
+nt.links.new(step(sep.outputs[2], 0.5, 0.72), lotf.inputs[0])
+nt.links.new(inv.outputs[0], lotf.inputs[1])
+c = mix(lotf.outputs[0], c, (0.075, 0.077, 0.082, 1))            # parking lots
 c = mix(road, c, (0.055, 0.057, 0.062, 1))                        # asphalt
 mm = nt.nodes.new('ShaderNodeMixRGB')
 mm.blend_type = 'MULTIPLY'
