@@ -2,7 +2,7 @@ import * as THREE from 'three';
 import {GLTFLoader} from 'three/addons/loaders/GLTFLoader.js';
 import {clone as skClone} from 'three/addons/utils/SkeletonUtils.js';
 /* Downtown Everett built from City of Everett GIS data: street centerlines, building footprints, 2 ft contours, parks, bus stops, 2022 aerial imagery. 10 units = 1 m, one tile = 2 m. */
-const PI=Math.PI,T=20,DV='?v=1125k';
+const PI=Math.PI,T=20,DV='?v=1125l';
 let MW=0,MH=0,WW=0,WH=0,map=new Uint8Array(1),HMAP=null,gw=0,gh=0,GS=80,WORLD=null;
 const WATER=0,GRASS=1,ROAD=2,WALK=3,BLDG=4,PARK=5,CONC=6,HOUSE=7;
 const SOL=[1,0,0,0,1,0,0,0];
@@ -508,7 +508,7 @@ function update(dt){
  // camera: free look from the right stick / mouse / right-side drag; it drifts back behind you after a moment
  if(P.car&&lookT>0.35){const c=P.car;yaw+=adiff(c.a+(c.v<-25?PI:0)+(c.st||0)*0.16,yaw)*Math.min(1,dt*(3.0+Math.abs(c.v)/80));}
  if(lookT>1.4){if(P.car){}else if(P.mov&&!P.dead&&!AIM){const d=adiff(P.a,yaw);if(Math.abs(d)<2.4)yaw+=d*Math.min(1,dt*1.2);}
-  pitch+=((P.car?0.24:0.2)-pitch)*Math.min(1,dt*1.5);}
+  pitch+=((P.car?0.2:0.13)-pitch)*Math.min(1,dt*1.5);}
  cam.x=P.x;cam.y=P.y;
 }
 
@@ -806,7 +806,7 @@ function init3D(){
 function initMarkers(){GV.forEach((gv,i)=>MK['g'+i]=mkMarker(gv.type==='race'?'#ff5ad0':'#ffd23f',gv.type==='courier'?'COURIER':gv.type==='race'?'RACE':'EXPORT'));PKG.forEach(p=>{p.m=box(9,9,9,0,0,0,0,null,bmat('#40e0ff'));p.m.castShadow=false;scene.add(p.m);});
  MK.shop=mkMarker('#ff8a30','BODY SHOP');MK.pawn=mkMarker('#7ad06a','AMMO');MK.hosp=mkMarker('#ff5a6a','HEAL');MK.tgt=mkMarker('#ffe45a','▼');MK.story=mkMarker('#40e0ff','STORY');}
 /* --- optional: Google Photorealistic 3D Tiles. Needs the player's own Map Tiles API key and a normal web host (blocked inside the Claude artifact). --- */
-const BUILD='Nov 26 12:05am - Driving';
+const BUILD='Nov 26 12:30am - Camera';
 /* ---------- film pass: HDR scene -> sharpen, glow, tone map, grade, grain ---------- */
 let FX=null;const GTKU={value:1};
 function initFX(){try{const sz=ren.getDrawingBufferSize(new THREE.Vector2()),rt=new THREE.WebGLRenderTarget(sz.x,sz.y,{samples:LOW?0:4,type:THREE.HalfFloatType});rt.depthTexture=new THREE.DepthTexture(sz.x,sz.y);
@@ -946,6 +946,7 @@ if(scene.fog){const gold=isDay?(1-ss(0.1,0.45,up))*(1-night):0;scene.fog.color.c
  if(DN.pool.length&&time-DN.pt>0.4){DN.pt=time;const cx=P.x,cy=P.y;const near=DN.lit.map(l=>[(l.x-cx)**2+(l.z-cy)**2,l]).sort((a,b)=>a[0]-b[0]);
   DN.pool.forEach((pl,i)=>{const l=near[i]&&near[i][0]<1500*1500?near[i][1]:null;pl.visible=!!l&&night>0.05&&!DN.inset;if(l)pl.position.copy(l);});}
  for(const pl of DN.pool)pl.intensity=7000*night;
+ if(!DN.pf){DN.pf=new THREE.PointLight(0xffe8cc,0,190,1.5);scene.add(DN.pf);}DN.pf.position.set(P.x+(cam3.position.x-P.x)*0.4,Hg(P.x,P.y)+34,P.y+(cam3.position.z-P.y)*0.4);DN.pf.intensity=DN.inset||MENU?0:800*night;
  if(time-(DN.tt||-9)>0.4){DN.tt=time;const R=(LOW?1500:2600)*(qual===0?0.65:1);for(const c of TCELLS){const v=!DN.inset&&!(GT&&gReady)&&Math.abs(c.x-P.x)+Math.abs(c.y-P.y)<R;for(const o of c.o)o.visible=v;}}}
 function render(){
  frameId++;const dt=clamp(time-lastT,0,0.05);lastT=time;gDt=dt||0.016;rayBudget=LOW?4:7;
@@ -968,14 +969,14 @@ function render(){
  for(let i=dyn.length-1;i>=0;i--){const e=dyn[i];if(e._s!==frameId){dynG.remove(e._m);if(e._m.isLine)e._m.geometry.dispose();e._m=null;dyn.splice(i,1);}}
  GV.forEach((gv,i)=>setMarker('g'+i,gv.x,gv.y,!M));setMarker('shop',SHOP.door.x,SHOP.door.y,true);setMarker('pawn',PAWN.curb.x,PAWN.curb.y,true);setMarker('hosp',HOSP.curb.x,HOSP.curb.y,true);setMarker('tgt',M?M.tx:0,M?M.ty:0,!!M&&!M.hide);{const sc=MODE==='story'&&!M&&!CUT&&ST<STORY.length?STORY[ST]:null;setMarker('story',sc?sc.gx:0,sc?sc.gy:0,!!sc);}
  // third-person camera: orbit distance and height from pitch, pulled in when a wall is behind, closer over the shoulder when aiming
- const cy=yaw+(lookBack?PI:0),sp=P.car?Math.abs(P.car.v):0,Dw=P.car?P.car.l*1.25+34+sp*0.07:(AIM?24:46),Hc=P.car?(VSPEC[P.car.model].h||15)+6:(AIM?21:18);let dd=Dw;
+ const cy=yaw+(lookBack?PI:0),sp=P.car?Math.abs(P.car.v):0,Dw=P.car?P.car.l*1.2+(P.car.model==='moto'?22:27)+sp*0.06:(AIM?22:30),Hc=P.car?(VSPEC[P.car.model].h||15)+6:(AIM?20.5:16.5);let dd=Dw;
  for(let s=8;s<=Dw;s+=6){if(solidTileNoWater(P.x-Math.cos(cy)*s,P.y-Math.sin(cy)*s)){dd=Math.max(14,s-10);break;}}
- camD+=(dd-camD)*(dd<camD?0.5:0.08);const sx=shake?rand(-shake,shake)*0.5:0,cp=Math.cos(pitch),sn=Math.sin(pitch),sh=AIM?7:0;
+ camD+=(dd-camD)*(dd<camD?0.5:0.08);const sx=shake?rand(-shake,shake)*0.5:0,cp=Math.cos(pitch),sn=Math.sin(pitch),sh=AIM?7:(P.car?0:3.2);
  const pg=P.car?gY(P.car,true):gY(P,true);if(P.car){P.gy=P.car.gy;P.gt=P.car.gt;P.gyr=pg;P.gl=pg;}else P.gl=pg;gBump();
  const py=pg+(P.car?0:(P.z||0)*0.6),cxp=P.x-Math.cos(cy)*camD*cp-Math.sin(cy)*sh+sx,czp=P.y-Math.sin(cy)*camD*cp+Math.cos(cy)*sh;
  cam3.position.set(cxp,Math.max(py+Hc+camD*sn+(Dw-camD)*0.35+sx,(GT&&gReady?py:Hat(cxp,czp))+7),czp);
- const lf=AIM?90:38;if(MENU)CAMO=menuCam();if(DBGC)CAMO=DBGC;if(CAMO){cam3.position.set(CAMO[0],CAMO[1],CAMO[2]);cam3.lookAt(CAMO[3],CAMO[4],CAMO[5]);}else cam3.lookAt(P.x+Math.cos(cy)*lf-Math.sin(cy)*sh,py+Hc-(AIM?0:2)-sn*lf*0.25,P.y+Math.sin(cy)*lf+Math.cos(cy)*sh);
- const bf=(W<H?74:58)-(AIM?12:0),cf=CAMO&&!MENU?(CAMO[6]||42)*(W<H?1.5:1):0,tf=cf||bf+clamp(sp/300,0,1)*12;if(Math.abs(cam3.fov-tf)>0.2){cam3.fov=cf?tf:cam3.fov+(tf-cam3.fov)*0.1;cam3.updateProjectionMatrix();}
+ const lf=AIM?90:(P.car?38:30);if(MENU)CAMO=menuCam();if(DBGC)CAMO=DBGC;if(CAMO){cam3.position.set(CAMO[0],CAMO[1],CAMO[2]);cam3.lookAt(CAMO[3],CAMO[4],CAMO[5]);}else cam3.lookAt(P.x+Math.cos(cy)*lf-Math.sin(cy)*sh,py+Hc-(AIM?0:2)-sn*lf*0.25,P.y+Math.sin(cy)*lf+Math.cos(cy)*sh);
+ const bf=(W<H?66:56)-(AIM?12:0),cf=CAMO&&!MENU?(CAMO[6]||42)*(W<H?1.5:1):0,tf=cf||bf+clamp(sp/300,0,1)*12;if(Math.abs(cam3.fov-tf)>0.2){cam3.fov=cf?tf:cam3.fov+(tf-cam3.fov)*0.1;cam3.updateProjectionMatrix();}
  dayNight();sun.target.position.set(Math.round(P.x/20)*20,py,Math.round(P.y/20)*20);sun.position.copy(sun.target.position).addScaledVector(SUNV,2000);
  if(GT){cam3.updateMatrixWorld();GT.update();if(time-gAttrT>2||time<gAttrT){gAttrT=time;const e=document.getElementById('gattr');if(e){const a=GT.getAttributions().filter(q=>q.type==='string').map(q=>q.value).join('; ');e.textContent='Google'+(a?' · '+a:'');}}}
  drawFrame();audioStep();
@@ -1039,7 +1040,7 @@ function buildBig(){if(bigmap)return bigmap;bigmap=document.createElement('canva
 function reset(){cars=[];peds=[];fx=[];picks=[];stains=[];pts=0;stars=0;M=null;for(const s of SPOTS){s.on=false;s.taken=false;}
  const s=lm('Everett Station');P.x=s.curb.x+T*5;P.y=s.curb.y;if(solidAt(P.x,P.y)){P.x=s.door.x;P.y=s.door.y;}P.hp=100;P.car=null;P.dead=0;cam.x=P.x;cam.y=P.y;yaw=PI;
  streamSpots(true);for(let i=0;i<(LOW?12:22);i++)spawnTraffic(i===3?'taxi':i===7?'bus':'civ',true);for(let i=0;i<(LOW?10:22);i++)spawnPed(true);}
-function resize(){DPR=Math.min(window.devicePixelRatio||1,2);W=window.innerWidth;H=window.innerHeight;hc.width=W*DPR;hc.height=H*DPR;ren.setPixelRatio(Math.min(window.devicePixelRatio||1,LOW?1.25:2));ren.setSize(W,H,false);cam3.aspect=W/H;cam3.fov=W<H?74:58;cam3.updateProjectionMatrix();}
+function resize(){DPR=Math.min(window.devicePixelRatio||1,2);W=window.innerWidth;H=window.innerHeight;hc.width=W*DPR;hc.height=H*DPR;ren.setPixelRatio(Math.min(window.devicePixelRatio||1,LOW?1.25:2));ren.setSize(W,H,false);cam3.aspect=W/H;cam3.fov=W<H?66:56;cam3.updateProjectionMatrix();}
 let last=0;
 let fpsN=0,fpsT=0,qual=2;
 function frame(t){const raw=(t-last)/1000||0,dt=Math.min(0.05,raw);last=t;if(!paused){{let rem=Math.min(0.15,raw||0.016);while(rem>1e-4){const d=Math.min(0.05,rem);update(P.dead>0?d*0.45:d);rem-=d;}}fpsN++;fpsT+=raw;if(fpsT>4){const f=fpsN/fpsT;fpsN=0;fpsT=0;if(f<25&&qual>0&&!window.EV_NOADAPT){qual--;if(qual===1){sun.castShadow=false;}else{ren.setPixelRatio(1);ren.setSize(W,H,false);}}}}render();requestAnimationFrame(frame);}
