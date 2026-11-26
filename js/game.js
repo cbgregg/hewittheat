@@ -2,7 +2,7 @@ import * as THREE from 'three';
 import {GLTFLoader} from 'three/addons/loaders/GLTFLoader.js';
 import {clone as skClone} from 'three/addons/utils/SkeletonUtils.js';
 /* Downtown Everett built from City of Everett GIS data: street centerlines, building footprints, 2 ft contours, parks, bus stops, 2022 aerial imagery. 10 units = 1 m, one tile = 2 m. */
-const PI=Math.PI,T=20,DV='?v=1125i';
+const PI=Math.PI,T=20,DV='?v=1125j';
 let MW=0,MH=0,WW=0,WH=0,map=new Uint8Array(1),HMAP=null,gw=0,gh=0,GS=80,WORLD=null;
 const WATER=0,GRASS=1,ROAD=2,WALK=3,BLDG=4,PARK=5,CONC=6,HOUSE=7;
 const SOL=[1,0,0,0,1,0,0,0];
@@ -588,7 +588,8 @@ function airMat(tex,U){const m=new THREE.MeshStandardMaterial({map:tex,roughness
    diffuseColor.rgb=c;}`);};
  return m;}
 function inst(geo,mat,mats,cast){const im=new THREE.InstancedMesh(geo,mat,mats.length);mats.forEach((m,k)=>im.setMatrixAt(k,m));im.castShadow=!!cast;im.receiveShadow=true;im.frustumCulled=false;scene.add(im);return im;}
-function instGLB(g,mats,cast,ry,col,out){if(!g||!mats.length)return;g.updateMatrixWorld(true);const R=new THREE.Matrix4().makeRotationY(ry||0);g.traverse(o=>{if(!o.isMesh)return;const ge=o.geometry.clone();ge.applyMatrix4(o.matrixWorld);ge.applyMatrix4(R);const m=o.material;m.metalness=0;m.roughness=0.8;if(m.emissive){m.emissive.set(0);m.emissiveMap=null;}if(col)m.color.set(col);if(m.map)m.map.anisotropy=4;if(m.transparent){m.transparent=false;m.alphaTest=0.5;m.depthWrite=true;}const im=inst(ge,m,mats,cast);if(out)out.push(im);});}
+function instGLB(g,mats,cast,ry,col,out){if(!g||!mats.length)return;g.updateMatrixWorld(true);const R=new THREE.Matrix4().makeRotationY(ry||0);g.traverse(o=>{if(!o.isMesh)return;const ge=o.geometry.clone();ge.applyMatrix4(o.matrixWorld);ge.applyMatrix4(R);const m=o.material;m.metalness=0;m.roughness=0.8;if(m.emissive){m.emissive.set(0);m.emissiveMap=null;}if(col)m.color.set(col);if(m.map)m.map.anisotropy=4;if(m.transparent){m.transparent=false;m.alphaTest=0.5;m.depthWrite=true;}if(mats.length>30&&!out){const C=new Map();for(const mm of mats){const e=mm.elements,k=Math.floor(e[12]/1400)+','+Math.floor(e[14]/1400);let c=C.get(k);if(!c){c={m:[],x:0,y:0,o:[]};C.set(k,c);}c.m.push(mm);c.x+=e[12];c.y+=e[14];}C.forEach(c=>{c.x/=c.m.length;c.y/=c.m.length;const im=inst(ge,m,c.m,cast);im.computeBoundingSphere();im.frustumCulled=true;c.o.push(im);TCELLS.push(c);});}
+  else{const im=inst(ge,m,mats,cast);if(out){im.computeBoundingSphere();im.frustumCulled=true;out.push(im);}}});}
 function buildStatic(){
  const n0=scene.children.length;buildStatic2();for(let i=n0;i<scene.children.length;i++)if(!scene.children[i].isSprite)STATIC.push(scene.children[i]);}
 function buildStatic2(){
@@ -801,7 +802,7 @@ function init3D(){
 function initMarkers(){GV.forEach((gv,i)=>MK['g'+i]=mkMarker(gv.type==='race'?'#ff5ad0':'#ffd23f',gv.type==='courier'?'COURIER':gv.type==='race'?'RACE':'EXPORT'));PKG.forEach(p=>{p.m=box(9,9,9,0,0,0,0,null,bmat('#40e0ff'));p.m.castShadow=false;scene.add(p.m);});
  MK.shop=mkMarker('#ff8a30','BODY SHOP');MK.pawn=mkMarker('#7ad06a','AMMO');MK.hosp=mkMarker('#ff5a6a','HEAL');MK.tgt=mkMarker('#ffe45a','▼');MK.story=mkMarker('#40e0ff','STORY');}
 /* --- optional: Google Photorealistic 3D Tiles. Needs the player's own Map Tiles API key and a normal web host (blocked inside the Claude artifact). --- */
-const BUILD='Nov 25 10:45pm - Audio HQ';
+const BUILD='Nov 25 11:10pm - Performance';
 /* ---------- film pass: HDR scene -> sharpen, glow, tone map, grade, grain ---------- */
 let FX=null;const GTKU={value:1};
 function initFX(){try{const sz=ren.getDrawingBufferSize(new THREE.Vector2()),rt=new THREE.WebGLRenderTarget(sz.x,sz.y,{samples:LOW?0:4,type:THREE.HalfFloatType});rt.depthTexture=new THREE.DepthTexture(sz.x,sz.y);
@@ -941,7 +942,7 @@ if(scene.fog){const gold=isDay?(1-ss(0.1,0.45,up))*(1-night):0;scene.fog.color.c
  if(DN.pool.length&&time-DN.pt>0.4){DN.pt=time;const cx=P.x,cy=P.y;const near=DN.lit.map(l=>[(l.x-cx)**2+(l.z-cy)**2,l]).sort((a,b)=>a[0]-b[0]);
   DN.pool.forEach((pl,i)=>{const l=near[i]&&near[i][0]<1500*1500?near[i][1]:null;pl.visible=!!l&&night>0.05&&!DN.inset;if(l)pl.position.copy(l);});}
  for(const pl of DN.pool)pl.intensity=7000*night;
- if(time-(DN.tt||-9)>0.4){DN.tt=time;const R=LOW?2600:4400;for(const c of TCELLS){const v=!DN.inset&&!(GT&&gReady)&&Math.abs(c.x-P.x)+Math.abs(c.y-P.y)<R;for(const o of c.o)o.visible=v;}}}
+ if(time-(DN.tt||-9)>0.4){DN.tt=time;const R=(LOW?1500:2600)*(qual===0?0.65:1);for(const c of TCELLS){const v=!DN.inset&&!(GT&&gReady)&&Math.abs(c.x-P.x)+Math.abs(c.y-P.y)<R;for(const o of c.o)o.visible=v;}}}
 function render(){
  frameId++;const dt=clamp(time-lastT,0,0.05);lastT=time;gDt=dt||0.016;rayBudget=LOW?4:7;
  const SC=[0xff2a20,0xffc020,0x20ff50];MAT.tlNS.color.setHex(SC[sigState(true)]);MAT.tlEW.color.setHex(SC[sigState(false)]);
@@ -1037,7 +1038,7 @@ function reset(){cars=[];peds=[];fx=[];picks=[];stains=[];pts=0;stars=0;M=null;f
 function resize(){DPR=Math.min(window.devicePixelRatio||1,2);W=window.innerWidth;H=window.innerHeight;hc.width=W*DPR;hc.height=H*DPR;ren.setPixelRatio(Math.min(window.devicePixelRatio||1,LOW?1.25:2));ren.setSize(W,H,false);cam3.aspect=W/H;cam3.fov=W<H?74:58;cam3.updateProjectionMatrix();}
 let last=0;
 let fpsN=0,fpsT=0,qual=2;
-function frame(t){const raw=(t-last)/1000||0,dt=Math.min(0.05,raw);last=t;if(!paused){update(P.dead>0?dt*0.45:dt);fpsN++;fpsT+=raw;if(fpsT>4){const f=fpsN/fpsT;fpsN=0;fpsT=0;if(f<25&&qual>0&&!window.EV_NOADAPT){qual--;if(qual===1){sun.castShadow=false;}else{ren.setPixelRatio(1);ren.setSize(W,H,false);}}}}render();requestAnimationFrame(frame);}
+function frame(t){const raw=(t-last)/1000||0,dt=Math.min(0.05,raw);last=t;if(!paused){{let rem=Math.min(0.15,raw||0.016);while(rem>1e-4){const d=Math.min(0.05,rem);update(P.dead>0?d*0.45:d);rem-=d;}}fpsN++;fpsT+=raw;if(fpsT>4){const f=fpsN/fpsT;fpsN=0;fpsT=0;if(f<25&&qual>0&&!window.EV_NOADAPT){qual--;if(qual===1){sun.castShadow=false;}else{ren.setPixelRatio(1);ren.setSize(W,H,false);}}}}render();requestAnimationFrame(frame);}
 async function boot(){
  cv=document.getElementById('c');hc=document.getElementById('h');g=hc.getContext('2d');const sb=document.getElementById('start');sb.disabled=true;
  init3D();resize();window.addEventListener('resize',resize);
@@ -1093,5 +1094,5 @@ function toggleMap(){const o=document.getElementById('mapov');if(document.getEle
   {const cm=document.getElementById('cmap');if(cm){buildCounty();cm.style.display=CW?'block':'none';if(CW)drawCountyMap(cm);}}
   document.getElementById('pkc').textContent='Packages '+Object.keys(pkgGot).length+'/'+PKG.length;
   const w=document.getElementById('mapwrap');w.scrollLeft=P.x/WW*c.clientWidth-w.clientWidth/2;{const cm=document.getElementById('cmap'),ch=cm&&cm.style.display!=='none'?cm.clientHeight+12:0;w.scrollTop=OOB(P.x,P.y)?0:ch+P.y/WH*c.clientHeight-w.clientHeight/2;}}}
-window.G={cam:v=>{DBGC=v;if(!v)CAMO=null;},vo,voxLevel,setHour:h=>{TOFF=((h*60-540-time)%1440+1440)%1440;},setShow,setHide,gtStats:()=>GT&&GT.stats,boot,update,render,P,nextWeapon,makePed,get GV(){return GV;},nodes,get LM(){return LM;},get map(){return map;},Hat,get STOPS(){return STOPS;},get SPOTS(){return SPOTS;},makeCar,tileAt,get cars(){return cars;},get peds(){return peds;},useBtn,crime,startMission,setPaused:v=>paused=v,shoot,tile,solidAt,get M(){return M;},get stars(){return stars;},VSPEC,GUN,SND,get STORY(){return STORY;},get ST(){return ST;},set ST(v){ST=v;syncStoryPed();},get CONTACTS(){return CONTACTS;},setPts:v=>{pts=v;cool=0;},lm,missionStep,travel,startStoryMode,startFree,toMenu,get CUT(){return CUT;},get MODE(){return MODE;},get MENU(){return MENU;},skip:()=>{skipTap=true;},OOB,get CW(){return CW;},get gReady(){return gReady;},gCast};
+window.G={stats:()=>{ren.info.autoReset=false;ren.info.reset();render();const r={tri:ren.info.render.triangles,calls:ren.info.render.calls,qual};ren.info.autoReset=true;return r;},cam:v=>{DBGC=v;if(!v)CAMO=null;},vo,voxLevel,setHour:h=>{TOFF=((h*60-540-time)%1440+1440)%1440;},setShow,setHide,gtStats:()=>GT&&GT.stats,boot,update,render,P,nextWeapon,makePed,get GV(){return GV;},nodes,get LM(){return LM;},get map(){return map;},Hat,get STOPS(){return STOPS;},get SPOTS(){return SPOTS;},makeCar,tileAt,get cars(){return cars;},get peds(){return peds;},useBtn,crime,startMission,setPaused:v=>paused=v,shoot,tile,solidAt,get M(){return M;},get stars(){return stars;},VSPEC,GUN,SND,get STORY(){return STORY;},get ST(){return ST;},set ST(v){ST=v;syncStoryPed();},get CONTACTS(){return CONTACTS;},setPts:v=>{pts=v;cool=0;},lm,missionStep,travel,startStoryMode,startFree,toMenu,get CUT(){return CUT;},get MODE(){return MODE;},get MENU(){return MENU;},skip:()=>{skipTap=true;},OOB,get CW(){return CW;},get gReady(){return gReady;},gCast};
 boot();
