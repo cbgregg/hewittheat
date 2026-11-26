@@ -403,6 +403,8 @@ for i, b in enumerate(BLD):
     L = look(i)
     if L.get('fl'):
         h = L['fl'] * FLH + (10 if L.get('special') != 'construction' else 0)
+    if L.get('hft'):
+        h = L['hft'] * 3.048  # measured roof height in feet (county LiDAR, via tools/dossier.py)
     base, top = lo - 4, gm + h
     r = random.Random(i * 104729 + 7)
     stats[L['wall']] = stats.get(L['wall'], 0) + 1
@@ -479,7 +481,10 @@ for i, b in enumerate(BLD):
         if gm - min(es[k], es[j]) > 2.5:
             BF.quad(plain, (a[0], base, a[1]), (c[0], base, c[1]), (c[0], gm, c[1]), (a[0], gm, a[1]), (0, 0, 1, 1), found)
         z0 = gm
-        if sh:
+        onx, ony = (py[j] - py[k]) / ln, -(px[j] - px[k]) / ln
+        side = ('E' if onx > 0 else 'W') if abs(onx) > abs(ony) else ('S' if ony > 0 else 'N')
+        shw = sh if (L.get('shopon') is None or side in L['shopon']) else 0
+        if shw:
             SB = BF.get(cx, cy, shop)
             ns = max(1, round(ln / 80))
             if ln < 30:
@@ -487,16 +492,26 @@ for i, b in enumerate(BLD):
             else:
                 BF.quad(SB, (a[0], z0, a[1]), (c[0], z0, c[1]), (c[0], z0 + sh, c[1]), (a[0], z0 + sh, a[1]), (0, 0, ns, 1), WHITE, 0.7)
             z0 += sh
-        ua, ub, vs = wall_uv(wm, ln, max(hh, 8))
+        ua, ub, vs = wall_uv(wm, ln, max(rt - z0, 8))
         st = L.get('stripe')
         nseg = max(1, round(ln / st[1])) if st and ln > st[1] * 0.75 else 1
+        if side in (L.get('blank') or '') and FAC[wm][4] and not FAC[wm][5] and ln > FAC[wm][4]:
+            # party or alley wall: repeat the windowless strip of the facade tile along the whole wall
+            bw = max(FAC[wm][4], ln / 48)
+            nq = max(1, round(ln / bw))
+            for q in range(nq):
+                t0, t1 = q / nq, (q + 1) / nq
+                sa_, sc_ = (a[0] + (c[0] - a[0]) * t0, a[1] + (c[1] - a[1]) * t0), (a[0] + (c[0] - a[0]) * t1, a[1] + (c[1] - a[1]) * t1)
+                BF.quad(WB, (sa_[0], z0, sa_[1]), (sc_[0], z0, sc_[1]), (sc_[0], rt, sc_[1]), (sa_[0], rt, sa_[1]),
+                        (-FAC[wm][4] / 2 / FAC[wm][0], 0.0, FAC[wm][4] / 2 / FAC[wm][0], (rt - z0) * vs), tuple(v * 0.9 for v in tint), 0.72)
+            nseg = 0
         for q in range(nseg):
             t0, t1 = q / nseg, (q + 1) / nseg
             sa_, sc_ = (a[0] + (c[0] - a[0]) * t0, a[1] + (c[1] - a[1]) * t0), (a[0] + (c[0] - a[0]) * t1, a[1] + (c[1] - a[1]) * t1)
             BF.quad(WB, (sa_[0], z0, sa_[1]), (sc_[0], z0, sc_[1]), (sc_[0], rt, sc_[1]), (sa_[0], rt, sa_[1]),
                     (ua + (ub - ua) * t0, 0.0, ua + (ub - ua) * t1, (rt - z0) * vs), st[0] if st and (q + k) % (st[2] if len(st) > 2 else 2) == (st[2] if len(st) > 2 else 2) - 1 else tint, 0.9 if sh else 0.72)
         onx, ony = (py[j] - py[k]) / ln, -(px[j] - px[k]) / ln
-        if L.get('awn') and sh and ln > 60:
+        if L.get('awn') and shw and ln > 60:
             na = max(1, round(ln / 80))
             for q in range(na):
                 t0, t1 = (q + 0.12) / na, (q + 0.88) / na
@@ -572,6 +587,10 @@ for i, b in enumerate(BLD):
             uvf = lambda x, y: (x / 64.0 - ox, y / 64.0 - oy)
         for t in tr:
             BF.tri(RBf, [(px[q], rt, py[q]) for q in t], [uvf(px[q], py[q]) for q in t], rc)
+        if L.get('pent'):
+            # mechanical penthouse: (east-west size, north-south size, height in feet, colour, offset east, offset south) in world units
+            pw, pd, ph, pc_, pox, poy = L['pent']
+            BF.box(plain, cx + pox, rt, cy + poy, pw, ph * 3.048, pd, lin(pc_))
         # rooftop plant
         if L['units'] and A > 15000 and L['roof'] != 'r_parking':
             cnt = max(1, min(7, int(A / 45000) + 1))

@@ -4,6 +4,8 @@ in data/world.json; tools/citygen.py applies them, and writes data/extras.json f
 
 Per building: wall (a tex/b facade), tint, roof, rtint, shop, fl (storeys), stripe=(second colour,
 segment length[, every Nth segment]) for fronts that alternate colour, awn (awning colour), special='construction'.
+hft = measured roof height in feet, shopon = compass sides that get a storefront ('S', 'WS'), blank = sides that are
+windowless party or alley walls, pent = rooftop penthouse (see citygen).
 SPLIT cuts one footprint north to south where the recording shows several buildings on it."""
 
 B = {
@@ -44,7 +46,6 @@ B = {
     # ---- Wetmore and Wall: the dark glass city offices
     4539: dict(wall='f_glass', tint='#4a5058', roof='r_membrane', rtint='#c9c9c6', shop=None),
     # ---- Hewitt and Oakes, north-west: long brick building with the pale blue metal roof
-    4311: dict(wall='f_brick_red', tint='#8f4d3c', roof='r_seam', rtint='#b9cfe0', shop='shop_brick', fl=2),
     # ---- the arena's pale blue roof
     5768: dict(rtint='#a9c4dc'),
 }
@@ -106,3 +107,75 @@ BRIDGES = [
 ]
 B.update({4238: dict(wall='f_garage', tint='#d8d6d0', roof='r_parking', rtint='#ffffff', shop=None)})
 
+
+
+# ---------------------------------------------------------------------------------------------------------------
+# Hewitt Ave, Colby to Oakes: set from the building dossiers (tools/dossier.py hewitt_colby_oakes).
+# Evidence per building is in data/dossier/hewitt_colby_oakes.json. What each value rests on:
+#   hft      county LiDAR roofprint mean height + 3 ft of parapet
+#   roof     county 2024 / city 2022 aerials (3 in per pixel)
+#   groups   several city footprints under one roof in the aerials are given one look, so they read as one building
+#   tint     brick textures carry their own colour, so brick tints stay near white and only shift the shade
+#   wall     W = seen (wall visible in an aerial or a street photo), R = public record (register listing),
+#            D = inferred from the Hewitt National Historic District setting, the use code and the roof; needs a street photo
+# ---------------------------------------------------------------------------------------------------------------
+WHITE_R, LIGHT_R, GREY_R, DARK_R = ('r_membrane', '#f0f1ee'), ('r_membrane', '#c4c7c1'), ('r_gravel', '#a3a59d'), ('r_gravel', '#585c58')
+
+
+def grp(ids, roof, **kw):
+    for i in ids:
+        B[i] = dict(kw, roof=roof[0], rtint=roof[1])
+
+
+# --- Colby to Wetmore, north side
+# 2825 Colby (office use, 5 storeys, 55 ft): pale precast frame over a tall glazed ground floor (W: street photo); stepped light roof
+grp([4273], LIGHT_R, wall='f_concrete', tint='#fbf8f0', shop='shop_modern', shopon='WS', blank='N', hft=60)
+# --- Colby to Wetmore, south side
+# 1602 Hewitt (bank use): 3-storey ribbed concrete podium on Colby (W: street photo) under a 10-storey white tower with a dark penthouse (W: 2022 aerial)
+grp([4388], ('r_membrane', '#a5a8a0'), wall='f_concrete', tint='#d2cfc6', shop=None, hft=42)
+grp([6024], ('r_membrane', '#dcdeda'), wall='f_panel', tint='#f6f5f0', shop=None, hft=98, pent=(95, 90, 26, '#5a5d60', -75, -45), units=False)
+# 1618-1620 Hewitt and 2902-2908 Wetmore: one 4-storey block (47 ft), dark roof, green corner awning (W: 2024 aerial); wall D
+grp([4390, 4391, 4405, 4422], DARK_R, wall='f_brick_red', tint='#f3e6df', shop='shop_brick', shopon='NE', blank='SW', awn='#2f6b55', hft=50)
+
+# --- Wetmore to Rockefeller, north side
+# 1701 Hewitt and 2825-2831 Wetmore (bank use): six footprints, one 2-storey building (31 ft), pale roof, pale walls and cornice (W: 2022 aerial)
+grp([4295, 4312, 4317, 4334, 4336, 5972], LIGHT_R, wall='f_brick_buff', tint='#fffaf0', shop='shop_buff', shopon='WS', blank='NE', hft=34)
+# 1705-1707 Hewitt (retail): four footprints, one 2-storey building (33 ft), dark roof, pale cornice band on Hewitt (W); wall D
+grp([5971, 5973, 5970, 4338], DARK_R, wall='f_brick_red', tint='#ffffff', shop='shop_brick', shopon='S', blank='NEW', awn='#2a2c30', hft=36)
+# 1709 Hewitt (restaurant): 2 storeys (32 ft), dark roof; wall D
+grp([5969, 4340], DARK_R, wall='f_brick_red', tint='#e2d6d2', shop='shop_brick', shopon='S', blank='NEW', awn='#7a2f2a', hft=35)
+# 1711 Hewitt (amusement / secondhand): wide 2-storey hall (26 ft), dark roof, pale canopy along the front (W: 2022 aerial); wall D
+grp([4301], DARK_R, wall='f_stucco', tint='#efe8d8', shop='shop_modern', shopon='S', blank='NEW', awn='#7fb5ae', hft=29)
+# 1715-1717 Hewitt (bar, offices): narrow 2-storey (28 ft), grey roof; wall D
+grp([4328, 4303], GREY_R, wall='f_brick_dark', tint='#f0ece8', shop='shop_brick', shopon='S', blank='NEW', hft=31)
+# 1719-1721 Hewitt and 2826-2828 Rockefeller (offices): four footprints, one 6-storey block (68 ft), white roof with light wells,
+# pale ornamented parapet (W: 2022 aerial)
+grp([4305, 4322, 4332, 4348], WHITE_R, wall='f_brick_buff', tint='#ffffff', shop='shop_buff', shopon='SE', blank='NW', hft=72)
+# --- Wetmore to Rockefeller, south side
+# 1702 Hewitt (bank): free-standing 2-storey (28 ft), white roof with ductwork, red-brown brick (W: 2022 aerial)
+grp([4393], WHITE_R, wall='f_brick_red', tint='#ffffff', shop=None, hft=31)
+# 1712 Hewitt (restaurant): 2 storeys (27 ft), grey gravel roof; wall D
+grp([4394], GREY_R, wall='f_brick_red', tint='#fff0e2', shop='shop_brick', shopon='N', blank='EWS', awn='#2a2c30', hft=30)
+# 1714-1716 Hewitt (retail): one 2-storey building (29 ft at the street, lower at the back), pale roof; wall D
+grp([4395, 4397], LIGHT_R, wall='f_brick_buff', tint='#eee6d6', shop='shop_buff', shopon='N', blank='EWS', hft=30)
+
+# --- Rockefeller to Oakes, north side
+# Commerce Building, 1801 Hewitt (R: National Register, built 1910; apartments): five footprints, 6 storeys (70 ft), grey gravel roof
+grp([4346, 4347, 4339, 4325, 4306], GREY_R, wall='f_brick_buff', tint='#f6ecd8', shop='shop_buff', shopon='SW', blank='NE', hft=73)
+# Morrow Building, 2823 Rockefeller (R: Everett Register): 2-3 storeys (34 ft), dark roof
+grp([4290], DARK_R, wall='f_brick_red', tint='#ecdcd4', shop='shop_brick', shopon='W', blank='NES', hft=37)
+# 1805 Hewitt (bar / retail): narrow 3-storey (35 ft), weathered grey roof with skylights; wall D
+grp([4331, 4307], GREY_R, wall='f_brick_red', tint='#e2d6d2', shop='shop_brick', shopon='S', blank='NEW', awn='#2a2c30', hft=38)
+# 1809 and 1811 Hewitt (electrical supplies): 2-storey (26 ft) and 1-storey (19 ft), both with bright white roofs; wall D
+grp([4309], WHITE_R, wall='f_brick_red', tint='#e2d6d2', shop='shop_brick', shopon='S', blank='NW', hft=29)
+grp([4311], WHITE_R, wall='f_brick_red', tint='#e2d6d2', shop='shop_brick', shopon='S', hft=21)
+# --- Rockefeller to Oakes, south side
+# 1804 Hewitt (31-50 apartments): 5 storeys (58 ft), pale roof with light wells; wall D
+grp([4398], LIGHT_R, wall='f_brick_red', tint='#f3e6df', shop='shop_brick', shopon='NW', blank='E', hft=61)
+# 1804-1806 Hewitt (12-15 apartments over shops): 3 storeys (30 ft), dark roofs; wall D
+grp([4399], DARK_R, wall='f_brick_buff', tint='#e9dfcc', shop='shop_buff', shopon='N', blank='EWS', hft=34)
+grp([4400, 4409], DARK_R, wall='f_brick_red', tint='#ecdcd4', shop='shop_brick', shopon='N', blank='EWS', awn='#3a5a3a', hft=33)
+# 1808-1810 Hewitt (secondhand shops): single storey (13 ft), dark roof; wall D
+grp([4401, 4402], DARK_R, wall='f_brick_dark', tint='#e4e6ea', shop='shop_modern', shopon='N', blank='EWS', hft=17)
+# Watson's Bakery, 1812 Hewitt (R: Everett Register): 2 storeys (25 ft), white roof, red brick with a maroon parapet cap (W: 2022 aerial)
+grp([4403, 4412], WHITE_R, wall='f_brick_red', tint='#f6e2da', shop='shop_brick', shopon='N', blank='W', hft=28)

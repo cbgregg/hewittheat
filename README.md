@@ -194,3 +194,27 @@ The film pass switches itself off on devices that cannot hold 25 frames a second
 
 `buildings.html` (on the site at `/buildings.html`) lists every building in the game on a map: tap one to see its number, nearest landmark, kind, storeys, footprint size and the wall and roof it currently has, with a link to street view at its approximate real position. A form sets the wall, colours, storeys, storefront, awning and state and takes a note. Changes are kept in the browser; Export or Copy produces `overrides.json`. Put that file in `data/` and run `tools/citygen.py` to rebuild the city with those changes (`data/buildings.json` is the list the browser reads, written by the same tool).
 
+
+## Building dossiers (internal)
+
+`tools/dossier.py NAME X0 Y0 X1 Y1` is a reference tool for whoever is setting the buildings, not part of the game. For every footprint in a box of the map it joins the public records for that spot and cuts aerial crops, then writes one sheet per building to `dossier/NAME/index.html`:
+
+| Source | What it gives |
+|---|---|
+| City of Everett building footprints | Street address, use code |
+| Snohomish County parcels | Parcel number, situs address, assessor use code, lot size |
+| Snohomish County roofprints | LiDAR roof height in feet (mean, 95th percentile, max) |
+| Snohomish County 911 address points | Every address on the footprint and its use |
+| City, state and national registers | Historic name, construction year, district |
+| County 2024 and city 2022 aerials, 3 in per pixel | Roof colour, roof layout, light wells, awnings, which footprints share one roof |
+| Wikimedia Commons | Links to geotagged street photos nearby |
+
+The game map is tied to State Plane coordinates by a fit against the city footprints (median error 0.17 ft), so the crops line up with the footprints.
+
+`dossier/` is not committed: the aerial photos are reference only and nothing from them goes into a game asset. A trimmed copy of the records (no owner names, no values) is kept in `data/dossier/NAME.json`.
+
+Not available from here: the assessor's per-structure page (year built, storeys, construction class) refuses automated requests, so storeys come from LiDAR height instead. Aerials look straight down, so wall material is only certain where a wall edge shows or a street photo exists; `tools/blocks.py` marks each wall as seen, from a record, or inferred.
+
+Hewitt Ave from Colby to Oakes is the first stretch set this way (48 footprints, 22 buildings). `tools/citygen.py` gained `hft` (measured height), `shopon` (which sides get a storefront), `blank` (windowless party and alley walls) and `pent` (rooftop penthouse).
+
+`tools/shot.py OUT.png "p=x,h,y&t=x,h,y"` takes stills of `data/city.glb` through `tools/preview.html` in headless Chrome, for before and after checks.
