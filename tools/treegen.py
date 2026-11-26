@@ -116,6 +116,7 @@ def limb(M, pts, radii, sides=7, col=(1, 1, 1), vscale=0.02):
     """tapered tube through a list of points"""
     rings = []
     v = 0.0
+    total = sum(math.dist(pts[k], pts[k - 1]) for k in range(1, len(pts))) or 1
     for k, (p, rad) in enumerate(zip(pts, radii)):
         a = pts[max(0, k - 1)]; b = pts[min(len(pts) - 1, k + 1)]
         t = norm((b[0] - a[0], b[1] - a[1], b[2] - a[2]))
@@ -123,12 +124,13 @@ def limb(M, pts, radii, sides=7, col=(1, 1, 1), vscale=0.02):
         u = norm((t[1] * ref[2] - t[2] * ref[1], t[2] * ref[0] - t[0] * ref[2], t[0] * ref[1] - t[1] * ref[0]))
         w = (t[1] * u[2] - t[2] * u[1], t[2] * u[0] - t[0] * u[2], t[0] * u[1] - t[1] * u[0])
         if k:
-            v += math.dist(p, pts[k - 1]) * vscale
+            v += math.dist(p, pts[k - 1]) / total
         ring = []
         for s in range(sides + 1):
             an = s / sides * 2 * math.pi
             nx = tuple(u[q] * math.cos(an) + w[q] * math.sin(an) for q in range(3))
-            ring.append(M.vert(tuple(p[q] + nx[q] * rad for q in range(3)), nx, (s / sides * 2, v), col))
+            uu = s / sides * 2
+            ring.append(M.vert(tuple(p[q] + nx[q] * rad for q in range(3)), nx, (0.52 + 0.46 * abs(uu % 2 - 1), 0.02 + 0.96 * v), col))
         rings.append(ring)
     for k in range(len(rings) - 1):
         for s in range(sides):
@@ -140,14 +142,14 @@ def card(M, c, ax, up, w, h, nrm, col, uv=(0, 0, 1, 1), pivot=0.5):
     hw = w / 2
     P = [tuple(c[q] - ax[q] * hw - up[q] * h * pivot for q in range(3)), tuple(c[q] + ax[q] * hw - up[q] * h * pivot for q in range(3)),
          tuple(c[q] + ax[q] * hw + up[q] * h * (1 - pivot) for q in range(3)), tuple(c[q] - ax[q] * hw + up[q] * h * (1 - pivot) for q in range(3))]
-    U = [(uv[0], uv[3]), (uv[2], uv[3]), (uv[2], uv[1]), (uv[0], uv[1])]
+    U = [(uv[0] * 0.5, uv[3]), (uv[2] * 0.5, uv[3]), (uv[2] * 0.5, uv[1]), (uv[0] * 0.5, uv[1])]
     ids = [M.vert(P[k], nrm[k] if isinstance(nrm, list) else nrm, U[k], col) for k in range(4)]
     M.quad(*ids)
 
 
 def broadleaf(seed, H, crown_r, crown_h, base, cards, trunk_r, tint, spread=1.0, lean=0.0):
     r = random.Random(seed)
-    B, L = Mesh(), Mesh()
+    B = L = Mesh()
     cx = lean * H
     cc = (cx * 0.7, base + crown_h * 0.5, 0.0)
     # trunk with a slight sweep, flared at the foot
@@ -168,6 +170,8 @@ def broadleaf(seed, H, crown_r, crown_h, base, cards, trunk_r, tint, spread=1.0,
         out = norm((p[0] - cc[0], (p[1] - cc[1]) * 1.2 + crown_h * 0.25, p[2]))
         t = norm((-math.sin(a) + r.uniform(-0.5, 0.5), r.uniform(-0.4, 0.4), math.cos(a) + r.uniform(-0.5, 0.5)))
         up = norm((out[0] * 0.5 + r.uniform(-0.4, 0.4), 0.8, out[2] * 0.5 + r.uniform(-0.4, 0.4)))
+        dp = sum(up[q] * t[q] for q in range(3))
+        up = norm(tuple(up[q] - t[q] * dp for q in range(3)))
         sz = crown_r * r.uniform(0.62, 0.95)
         shade = (0.62 + 0.38 * (z * 0.5 + 0.5)) * r.uniform(0.88, 1.08) * (0.8 + 0.2 * f)
         card(L, p, t, up, sz, sz, out, tuple(min(1.0, c * shade) for c in tint))
@@ -176,7 +180,7 @@ def broadleaf(seed, H, crown_r, crown_h, base, cards, trunk_r, tint, spread=1.0,
 
 def conifer(seed, H, base_r, tint, levels, per, droop, trunk_r, first=0.16, kind='fir'):
     r = random.Random(seed)
-    B, L = Mesh(), Mesh()
+    B = L = Mesh()
     limb(B, [(0, -3, 0), (0, 0, 0), (0, H * 0.5, 0), (0, H * 0.97, 0)], [trunk_r * 1.5, trunk_r * 1.2, trunk_r * 0.6, trunk_r * 0.06], 8)
     for lv in range(levels):
         f = lv / (levels - 1)
@@ -193,10 +197,14 @@ def conifer(seed, H, base_r, tint, levels, per, droop, trunk_r, first=0.16, kind
             col = tuple(min(1.0, c * shade) for c in tint)
             nrm = norm((dr[0] * 0.7, 0.7, dr[2] * 0.7))
             yy = y + r.uniform(-0.02, 0.02) * H
-            # each bough is two crossed cards: one lying flat, one standing on edge, so it reads from every side
-            card(L, (0, yy, 0), side, dn, ln * 0.62, ln, nrm, col, pivot=0.0)
-            upv = norm((dn[0] * 0.3, 1.0, dn[2] * 0.3))
-            card(L, (0, yy, 0), upv, dn, ln * 0.5, ln, nrm, tuple(c * 0.86 for c in col), pivot=0.0)
+            # each bough: a narrow frond lying along it, and sprays hanging from it so it has body from below and from the side
+            card(L, (0, yy, 0), side, dn, ln * 0.5, ln, nrm, col, pivot=0.0)
+            for q_ in (0.35, 0.62, 0.86):
+                c_ = (dn[0] * ln * q_, yy + dn[1] * ln * q_, dn[2] * ln * q_)
+                hang = norm((dn[0] * 0.35, -1.0, dn[2] * 0.35))
+                sz = ln * (0.52 - 0.22 * q_) * r.uniform(0.85, 1.15)
+                ax_ = norm((side[0] + dr[0] * r.uniform(-0.5, 0.5), 0, side[2] + dr[2] * r.uniform(-0.5, 0.5)))
+                card(L, c_, ax_, hang, sz * 1.25, sz, nrm, tuple(c * (0.8 + 0.1 * q_) for c in col), pivot=0.0)
     # a tuft at the leader
     for k in range(3):
         a = k * 2.1
@@ -205,9 +213,9 @@ def conifer(seed, H, base_r, tint, levels, per, droop, trunk_r, first=0.16, kind
 
 
 # ---------------------------------------------------------------- glb
-def write_glb(path, bark, leaf, leaf_tex):
+def write_glb(path, mesh, _same, leaf_tex):
     buf = bytearray()
-    views, accs, prims = [], [], []
+    views, accs = [], []
 
     def add(data, target=None):
         while len(buf) % 4:
@@ -215,28 +223,22 @@ def write_glb(path, bark, leaf, leaf_tex):
         views.append(dict(buffer=0, byteOffset=len(buf), byteLength=len(data), **({'target': target} if target else {})))
         buf.extend(data)
         return len(views) - 1
-
-    for mi, M in enumerate((bark, leaf)):
-        if not M.i:
-            continue
-        n = len(M.p)
-        a = {}
-        for key, arr, typ in (('POSITION', M.p, 'VEC3'), ('NORMAL', M.n, 'VEC3'), ('TEXCOORD_0', M.u, 'VEC2'), ('COLOR_0', M.c, 'VEC3')):
-            flat = [float(x) for v in arr for x in v]
-            bv = add(struct.pack('<%df' % len(flat), *flat), 34962)
-            acc = dict(bufferView=bv, componentType=5126, count=n, type=typ)
-            if key == 'POSITION':
-                acc['min'] = [min(v[q] for v in arr) for q in range(3)]; acc['max'] = [max(v[q] for v in arr) for q in range(3)]
-            accs.append(acc); a[key] = len(accs) - 1
-        bv = add(struct.pack('<%dI' % len(M.i), *M.i), 34963)
-        accs.append(dict(bufferView=bv, componentType=5125, count=len(M.i), type='SCALAR'))
-        prims.append(dict(attributes=a, indices=len(accs) - 1, material=mi))
+    M = mesh
+    n = len(M.p)
+    a = {}
+    for key, arr, typ in (('POSITION', M.p, 'VEC3'), ('NORMAL', M.n, 'VEC3'), ('TEXCOORD_0', M.u, 'VEC2'), ('COLOR_0', M.c, 'VEC3')):
+        flat = [float(x) for v in arr for x in v]
+        bv = add(struct.pack('<%df' % len(flat), *flat), 34962)
+        acc = dict(bufferView=bv, componentType=5126, count=n, type=typ)
+        if key == 'POSITION':
+            acc['min'] = [min(v[q] for v in arr) for q in range(3)]; acc['max'] = [max(v[q] for v in arr) for q in range(3)]
+        accs.append(acc); a[key] = len(accs) - 1
+    bv = add(struct.pack('<%dH' % len(M.i), *M.i), 34963)
+    accs.append(dict(bufferView=bv, componentType=5123, count=len(M.i), type='SCALAR'))
     g = dict(asset=dict(version='2.0', generator='hewittheat treegen'), scene=0, scenes=[dict(nodes=[0])], nodes=[dict(mesh=0, name=os.path.basename(path)[:-4])],
-             meshes=[dict(primitives=prims)], buffers=[dict(byteLength=len(buf))], bufferViews=views, accessors=accs,
-             images=[dict(uri='../tex/t/bark.jpg'), dict(uri='../tex/t/' + leaf_tex)], samplers=[dict(magFilter=9729, minFilter=9987, wrapS=10497, wrapT=10497)],
-             textures=[dict(source=0, sampler=0), dict(source=1, sampler=0)],
-             materials=[dict(name='bark', pbrMetallicRoughness=dict(baseColorTexture=dict(index=0), metallicFactor=0, roughnessFactor=0.95)),
-                        dict(name='leaf', doubleSided=True, alphaMode='MASK', alphaCutoff=0.3, pbrMetallicRoughness=dict(baseColorTexture=dict(index=1), metallicFactor=0, roughnessFactor=0.8))])
+             meshes=[dict(primitives=[dict(attributes=a, indices=len(accs) - 1, material=0)])], buffers=[dict(byteLength=len(buf))], bufferViews=views, accessors=accs,
+             images=[dict(uri='../tex/t/' + leaf_tex)], samplers=[dict(magFilter=9729, minFilter=9987, wrapS=33071, wrapT=33071)], textures=[dict(source=0, sampler=0)],
+             materials=[dict(name='leaf', doubleSided=True, alphaMode='MASK', alphaCutoff=0.3, pbrMetallicRoughness=dict(baseColorTexture=dict(index=0), metallicFactor=0, roughnessFactor=0.85))])
     js = json.dumps(g, separators=(',', ':')).encode()
     js += b' ' * (-len(js) % 4)
     while len(buf) % 4:
@@ -245,7 +247,14 @@ def write_glb(path, bark, leaf, leaf_tex):
         f.write(struct.pack('<III', 0x46546C67, 2, 12 + 8 + len(js) + 8 + len(buf)))
         f.write(struct.pack('<II', len(js), 0x4E4F534A)); f.write(js)
         f.write(struct.pack('<II', len(buf), 0x004E4942)); f.write(buf)
-    return len(bark.i) // 3 + len(leaf.i) // 3
+    return len(M.i) // 3
+
+
+def atlas(leaf_png, out):
+    """leaves on the left half, bark on the right, so a whole tree is one mesh and one draw call"""
+    lf = Image.open(leaf_png).convert('RGBA'); bk = Image.open(TEX + '/bark.jpg').convert('RGBA').resize((256, 256))
+    im = Image.new('RGBA', (512, 256)); im.paste(lf, (0, 0)); im.paste(bk, (256, 0))
+    im.save(out, optimize=True)
 
 
 KINDS = [
@@ -254,15 +263,21 @@ KINDS = [
 ]
 
 if __name__ == '__main__':
-    leaf_texture(TEX + '/leaf_broad.png', 1, (80, 120, 54))
-    leaf_texture(TEX + '/leaf_fir.png', 2, (56, 104, 62), 'fir')
-    leaf_texture(TEX + '/leaf_cedar.png', 3, (74, 120, 58), 'cedar')
+    leaf_texture(TEX + '/_broad.png', 1, (80, 120, 54))
+    leaf_texture(TEX + '/_fir.png', 2, (56, 104, 62), 'fir')
+    leaf_texture(TEX + '/_cedar.png', 3, (74, 120, 58), 'cedar')
     bark_texture(TEX + '/bark.jpg')
+    for k in ('broad', 'fir', 'cedar'):
+        atlas(TEX + '/_%s.png' % k, TEX + '/tree_%s.png' % k); os.remove(TEX + '/_%s.png' % k)
+    os.remove(TEX + '/bark.jpg')
+    for old in ('leaf_broad.png', 'leaf_fir.png', 'leaf_cedar.png'):
+        if os.path.exists(TEX + '/' + old):
+            os.remove(TEX + '/' + old)
     out = {}
-    out['maple'] = write_glb(ROOT + '/models/t_maple.glb', *broadleaf(11, 92, 34, 58, 30, 64, 2.3, (1.0, 1.0, 0.95)), 'leaf_broad.png')
-    out['bigleaf'] = write_glb(ROOT + '/models/t_bigleaf.glb', *broadleaf(12, 160, 62, 105, 48, 110, 4.6, (0.86, 0.96, 0.82), spread=1.05, lean=0.03), 'leaf_broad.png')
-    out['column'] = write_glb(ROOT + '/models/t_column.glb', *broadleaf(13, 100, 18, 78, 22, 52, 1.9, (0.82, 1.0, 0.8)), 'leaf_broad.png')
-    out['cherry'] = write_glb(ROOT + '/models/t_cherry.glb', *broadleaf(14, 56, 26, 34, 20, 46, 1.6, (1.0, 0.94, 0.8), spread=1.1), 'leaf_broad.png')
-    out['fir'] = write_glb(ROOT + '/models/t_fir.glb', *conifer(15, 262, 46, (0.92, 1.0, 0.95), 19, 7, 0.42, 4.4), 'leaf_fir.png')
-    out['cedar'] = write_glb(ROOT + '/models/t_cedar.glb', *conifer(16, 172, 42, (1.0, 1.0, 0.9), 14, 7, 0.75, 4.2, first=0.1, kind='cedar'), 'leaf_cedar.png')
+    out['maple'] = write_glb(ROOT + '/models/t_maple.glb', *broadleaf(11, 92, 34, 58, 30, 64, 2.3, (1.0, 1.0, 0.95)), 'tree_broad.png')
+    out['bigleaf'] = write_glb(ROOT + '/models/t_bigleaf.glb', *broadleaf(12, 160, 62, 105, 48, 110, 4.6, (0.86, 0.96, 0.82), spread=1.05, lean=0.03), 'tree_broad.png')
+    out['column'] = write_glb(ROOT + '/models/t_column.glb', *broadleaf(13, 100, 18, 78, 22, 52, 1.9, (0.82, 1.0, 0.8)), 'tree_broad.png')
+    out['cherry'] = write_glb(ROOT + '/models/t_cherry.glb', *broadleaf(14, 56, 26, 34, 20, 46, 1.6, (1.0, 0.94, 0.8), spread=1.1), 'tree_broad.png')
+    out['fir'] = write_glb(ROOT + '/models/t_fir.glb', *conifer(15, 262, 46, (0.92, 1.0, 0.95), 17, 6, 0.36, 4.4, first=0.24), 'tree_fir.png')
+    out['cedar'] = write_glb(ROOT + '/models/t_cedar.glb', *conifer(16, 172, 42, (1.0, 1.0, 0.9), 13, 6, 0.6, 4.2, first=0.16, kind='cedar'), 'tree_cedar.png')
     print('triangles', out)

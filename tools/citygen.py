@@ -736,12 +736,12 @@ def bsolid(x, y):
 
 import streets
 SIGN = sorted(set(json.load(open(REPO + '/data/dossier/signals.json'))['nodes'])) if os.path.exists(REPO + '/data/dossier/signals.json') else W['sig']
-STREET = streets.build(BF, W, Hat, bsolid, CORE, lin, EXTRA, SIGN, REPO)
+STREET, STREET_TILES = streets.build(BF, W, Hat, bsolid, CORE, lin, EXTRA, SIGN, REPO)
 json.dump(EXTRA, open(REPO + '/data/extras.json', 'w'), separators=(',', ':'))
 # collision map: clear the tiles of removed footprints, mark the tiles of added buildings (1 tile = 20 units)
 if not os.path.exists(REPO + '/data/map_base.png'):
     Image.open(REPO + '/data/map.png').save(REPO + '/data/map_base.png')
-mp = Image.open(REPO + '/data/map_base.png').convert('L')
+mp = STREET_TILES(Image.open(REPO + '/data/map_base.png').convert('L'))
 mpx = mp.load()
 TL = 20
 for i in GONE:

@@ -11,6 +11,7 @@ tools/street_data.py). Units: 10 = 1 m, y runs south."""
 import json, math, os, random
 
 KH = 1.5            # kerb height
+STRIP = 14.0        # planting strip between kerb and walk outside downtown
 PZ = 0.45           # paint sits this far above the road
 WHITE = (0.80, 0.80, 0.78)
 YELLOW = (0.78, 0.56, 0.06)
@@ -63,11 +64,63 @@ def samples(ch, t0, t1, step):
     return out
 
 
+def chains(W, CORE):
+    """junction-to-junction runs of the network, and the legs meeting at each junction"""
+    NODES, EDGES = W['nodes'], W['edges']
+    # ---------- streets as chains: the network has shape points every few metres, so walk through them from junction to junction ----------
+    inc = {}
+    for ei, e in enumerate(EDGES):
+        if math.hypot(NODES[e[0]][0] - NODES[e[1]][0], NODES[e[0]][1] - NODES[e[1]][1]) < 0.5:
+            continue
+        inc.setdefault(e[0], []).append(ei); inc.setdefault(e[1], []).append(ei)
+    isj = lambda n: len(inc[n]) != 2 or EDGES[inc[n][0]][2] != EDGES[inc[n][1]][2] or EDGES[inc[n][0]][4] != EDGES[inc[n][1]][4]
+    JUNC = set(n for n in inc if isj(n))
+    used, CHAINS, LEG, eids = set(), [], {}, []
+
+    def walk(n0, ei):
+        ids, cur, e = [n0], n0, ei
+        eids.clear()
+        while True:
+            used.add(e); eids.append(e)
+            cur = EDGES[e][1] if EDGES[e][0] == cur else EDGES[e][0]
+            ids.append(cur)
+            if cur in JUNC or cur == n0:
+                break
+            e = inc[cur][1] if inc[cur][0] == e else inc[cur][0]
+        return ids
+    starts = [(n, ei) for n in JUNC for ei in inc[n]] + [(EDGES[ei][0], ei) for ei in range(len(EDGES)) if EDGES[ei][0] in inc]
+    for n0, ei in starts:
+        if ei in used or n0 not in inc:
+            continue
+        ids = walk(n0, ei)
+        pts = [tuple(NODES[q]) for q in ids]
+        cum = [0.0]
+        for k in range(1, len(pts)):
+            cum.append(cum[-1] + math.hypot(pts[k][0] - pts[k - 1][0], pts[k][1] - pts[k - 1][1]))
+        e = EDGES[ei]
+        mid = pts[len(pts) // 2]
+        core = CORE((pts[0][0] + pts[-1][0]) / 2, (pts[0][1] + pts[-1][1]) / 2) and CORE(*mid)
+        ch = dict(ids=ids, eids=list(eids), pts=pts, cum=cum, L=cum[-1], w=e[2] * 10.0, nm=e[4], cls=e[5], core=core, sw=36.0 if core else 30.0, A=None, B=None, med=[])
+        if ch['L'] < 2:
+            continue
+        CHAINS.append(ch)
+        for end, nd in ((0, ids[0]), (1, ids[-1])):
+            if end == 1 and ids[-1] == ids[0]:
+                continue
+            q = pt(ch, min(60.0, ch['L'] * 0.5), 0) if end == 0 else pt(ch, ch['L'] - min(60.0, ch['L'] * 0.5), 0)
+            dl = math.hypot(q[0] - NODES[nd][0], q[1] - NODES[nd][1]) or 1
+            L = dict(ch=ch, end=end, d=((q[0] - NODES[nd][0]) / dl, (q[1] - NODES[nd][1]) / dl), w=ch['w'], ln=ch['L'], nm=ch['nm'], sw=ch['sw'], core=core, cw=0.0, ccw=0.0)
+            ch['A' if end == 0 else 'B'] = L
+            LEG.setdefault(nd, []).append(L)
+    return CHAINS, LEG
+
+
 def build(BF, W, Hat, bsolid, CORE, lin, EXTRA, sig_nodes, repo):
     NODES, EDGES, NAMES = W['nodes'], W['edges'], W['names']
     walkc = lin('#c9c6bd'); kerbtop = lin('#d4d1c8'); kerbc = tuple(v * 0.6 for v in lin('#b4b1a8'))
     plainb = lambda x, y: BF.get(x, y, 'plain')
     R = random.Random(7)
+    out_tiles = [None]
     stat = dict(walk=0, corner=0, paint=0, cross=0, stopbar=0, pad=0, manhole=0, pit=0)
 
     def top(B, pts, col, uv=None):
@@ -118,50 +171,29 @@ def build(BF, W, Hat, bsolid, CORE, lin, EXTRA, sig_nodes, repo):
             p0, p1 = (x + rad * math.cos(a0), y + rad * math.sin(a0)), (x + rad * math.cos(a1), y + rad * math.sin(a1))
             BF.tri(B, [c, (p1[0], Hat(*p1) + z, p1[1]), (p0[0], Hat(*p0) + z, p0[1])], [(0, 0), (1, 0), (0, 1)], col)
 
-    # ---------- streets as chains: the network has shape points every few metres, so walk through them from junction to junction ----------
-    inc = {}
-    for ei, e in enumerate(EDGES):
-        if math.hypot(NODES[e[0]][0] - NODES[e[1]][0], NODES[e[0]][1] - NODES[e[1]][1]) < 0.5:
-            continue
-        inc.setdefault(e[0], []).append(ei); inc.setdefault(e[1], []).append(ei)
-    isj = lambda n: len(inc[n]) != 2 or EDGES[inc[n][0]][2] != EDGES[inc[n][1]][2] or EDGES[inc[n][0]][4] != EDGES[inc[n][1]][4]
-    JUNC = set(n for n in inc if isj(n))
-    used, CHAINS, LEG = set(), [], {}
-
-    def walk(n0, ei):
-        ids, cur, e = [n0], n0, ei
-        while True:
-            used.add(e)
-            cur = EDGES[e][1] if EDGES[e][0] == cur else EDGES[e][0]
-            ids.append(cur)
-            if cur in JUNC or cur == n0:
-                break
-            e = inc[cur][1] if inc[cur][0] == e else inc[cur][0]
-        return ids
-    starts = [(n, ei) for n in JUNC for ei in inc[n]] + [(EDGES[ei][0], ei) for ei in range(len(EDGES)) if EDGES[ei][0] in inc]
-    for n0, ei in starts:
-        if ei in used or n0 not in inc:
-            continue
-        ids = walk(n0, ei)
-        pts = [tuple(NODES[q]) for q in ids]
-        cum = [0.0]
-        for k in range(1, len(pts)):
-            cum.append(cum[-1] + math.hypot(pts[k][0] - pts[k - 1][0], pts[k][1] - pts[k - 1][1]))
-        e = EDGES[ei]
-        mid = pts[len(pts) // 2]
-        core = CORE((pts[0][0] + pts[-1][0]) / 2, (pts[0][1] + pts[-1][1]) / 2) and CORE(*mid)
-        ch = dict(ids=ids, pts=pts, cum=cum, L=cum[-1], w=e[2] * 10.0, nm=e[4], core=core, sw=36.0 if core else 22.0, A=None, B=None)
-        if ch['L'] < 2:
-            continue
-        CHAINS.append(ch)
-        for end, nd in ((0, ids[0]), (1, ids[-1])):
-            if end == 1 and ids[-1] == ids[0]:
-                continue
-            q = pt(ch, min(60.0, ch['L'] * 0.5), 0) if end == 0 else pt(ch, ch['L'] - min(60.0, ch['L'] * 0.5), 0)
-            dl = math.hypot(q[0] - NODES[nd][0], q[1] - NODES[nd][1]) or 1
-            L = dict(ch=ch, end=end, d=((q[0] - NODES[nd][0]) / dl, (q[1] - NODES[nd][1]) / dl), w=ch['w'], ln=ch['L'], nm=ch['nm'], sw=ch['sw'], core=core, cw=0.0, ccw=0.0)
-            ch['A' if end == 0 else 'B'] = L
-            LEG.setdefault(nd, []).append(L)
+    CHAINS, LEG = chains(W, CORE)
+    JUNC = set(LEG)
+    MED = []
+    mf = repo + '/data/dossier/streets.json'
+    if os.path.exists(mf):
+        for poly in json.load(open(mf)).get('medians', []):
+            cx, cy = sum(q[0] for q in poly) / len(poly), sum(q[1] for q in poly) / len(poly)
+            best = None
+            for ch in CHAINS:
+                xs = [q[0] for q in ch['pts']]; ys = [q[1] for q in ch['pts']]
+                if not (min(xs) - 60 < cx < max(xs) + 60 and min(ys) - 60 < cy < max(ys) + 60):
+                    continue
+                t = 0.0
+                while t <= ch['L']:
+                    q = pt(ch, t, 0); dq = math.hypot(q[0] - cx, q[1] - cy)
+                    if best is None or dq < best[0]:
+                        best = (dq, ch, t)
+                    t += 15
+            if best and best[0] < 45:
+                ch = best[1]
+                half = max(math.hypot(q[0] - cx, q[1] - cy) for q in poly)
+                ch['med'].append((best[2] - half - 6, best[2] + half + 6))
+                MED.append((poly, ch, best[2], half))
 
     def isect(n, d1, p1, h1, d2, p2, h2):
         # n + d1*t + p1*h1 = n + d2*s + p2*h2
@@ -218,8 +250,8 @@ def build(BF, W, Hat, bsolid, CORE, lin, EXTRA, sig_nodes, repo):
         if ni in SIG and len(legs) >= 3:
             CTRL[ni] = ('sig', legs)
         elif len(legs) >= 3:
-            wm = max(L['w'] for L in legs)
-            minor = [L for L in legs if L['w'] < wm]
+            top_cls = min(L['ch']['cls'] for L in legs)      # street class: lower is more major
+            minor = [L for L in legs if L['ch']['cls'] > top_cls]
             if minor:
                 CTRL[ni] = ('stop', minor)
             elif any(L['core'] for L in legs):
@@ -296,44 +328,68 @@ def build(BF, W, Hat, bsolid, CORE, lin, EXTRA, sig_nodes, repo):
                 K0, K1 = pt(ch, t0, side * (w / 2 + 1.6)), pt(ch, t1, side * (w / 2 + 1.6))
                 Q0, Q1 = pt(ch, t0, side * (w / 2 + sw)), pt(ch, t1, side * (w / 2 + sw))
                 top(plainb(*P0), [P0, P1, K1, K0] if side > 0 else [P1, P0, K0, K1], kerbtop)
-                walkpoly([K0, K1, Q1, Q0] if side > 0 else [K1, K0, Q0, Q1])
+                if not core and sw >= 30:
+                    # outside downtown: kerb, a 1.2 m planting strip left as ground, then the walk
+                    S0, S1 = pt(ch, t0, side * (w / 2 + STRIP)), pt(ch, t1, side * (w / 2 + STRIP))
+                    walkpoly([S0, S1, Q1, Q0] if side > 0 else [S1, S0, Q0, Q1])
+                    face(S0, S1) if side < 0 else face(S1, S0)
+                    face(K1, K0) if side < 0 else face(K0, K1)
+                else:
+                    walkpoly([K0, K1, Q1, Q0] if side > 0 else [K1, K0, Q0, Q1])
                 face(P0, P1) if side < 0 else face(P1, P0)
                 stat['walk'] += 1
-            # street trees in pits along the kerb: downtown every 12 m or so, on the wide streets every 30 m
-            if core or w >= 140:
-                gap = 125.0 if core else 300.0
-                rr = random.Random(ci * 31 + side)
-                t = ta + 40 + rr.uniform(0, gap * 0.5)
-                while t < ln - tb - 40:
-                    x, y = pt(ch, t, side * (w / 2 + 9))
-                    if not bsolid(x, y) and not bsolid(*pt(ch, t, side * (w / 2 + 23))):
-                        trees.append([round(x), round(y), round(rr.uniform(0.75, 1.1), 2), rr.choice((0, 0, 2, 2, 3)) if core else rr.choice((0, 1))])
-                        if core:
-                            q = [pt(ch, t + u, side * (w / 2 + 9 + v)) for u, v in ((-7, -6), (7, -6), (7, 6), (-7, 6))]
-                            BF.quad(plainb(x, y), *[(px, Hat(px, py) + KH + 0.1, py) for px, py in (q if side > 0 else q[::-1])], (0, 0, 1, 1), (0.09, 0.075, 0.06))
-                            stat['pit'] += 1
-                    t += gap * rr.uniform(0.85, 1.2)
+            ch['run' + ('R' if side > 0 else 'L')] = (ta, ln - tb)
         # ---- paint
         end = lambda L: 0.0 if L is None else (L['bar'] + 5 if (L['ctl'] or L['xwalk']) else L['s0'])
         m0, m1 = end(LA), ln - end(LB)
         if m1 - m0 > 30:
-            if w >= 120 or core:
-                cline(ch, m0, m1, -1.5, 1.2, YELLOW); cline(ch, m0, m1, 1.5, 1.2, YELLOW)
-            if w >= 140:
+            marked = core or ch['cls'] < 8
+            lane_o = max(16.0, min(32.0, w / 5.0))            # where the game's traffic drives, measured from the centreline
+
+            def split(t0, t1):
+                """the stretch t0..t1 with the median islands cut out"""
+                parts, a_ = [], t0
+                for ma, mb in sorted(ch['med']):
+                    if mb < a_ or ma > t1:
+                        continue
+                    if ma > a_:
+                        parts.append((a_, ma))
+                    a_ = max(a_, mb)
+                if a_ < t1:
+                    parts.append((a_, t1))
+                return parts
+            if marked:
+                for a_, b_ in split(m0, m1):
+                    cline(ch, a_, b_, -1.5, 1.2, YELLOW); cline(ch, a_, b_, 1.5, 1.2, YELLOW)
+                for ma, mb in ch['med']:
+                    for s_ in (-1, 1):
+                        cline(ch, max(m0, ma), min(m1, mb), s_ * 19, 1.2, YELLOW)
+            if ch['cls'] in (4, 5) and w >= 130:
                 for s_ in (-1, 1):
                     cline(ch, m0 + 6, m1 - 6, s_ * w / 4, 1.1, WHITE, (30, 90))
                     cline(ch, m0, m1, s_ * (w / 2 - 4), 1.1, WHITE)
-            elif core or w >= 120:
-                # parking lanes: a line 2.3 m off each kerb with a tick at every stall
-                for s_ in (-1, 1):
-                    cline(ch, m0 + 20, m1 - 20, s_ * (w / 2 - 23), 1.0, WHITE)
-                    t = m0 + 20
-                    while t < m1 - 20:
-                        paint([pt(ch, t - 0.5, s_ * (w / 2 - 23)), pt(ch, t + 0.5, s_ * (w / 2 - 23)), pt(ch, t + 0.5, s_ * (w / 2 - 14)), pt(ch, t - 0.5, s_ * (w / 2 - 14))], WHITE)
-                        t += 62
+            elif marked:
+                # parking by what fits beside the traffic lane at the real kerb-to-kerb width:
+                # 45 degree stalls need 5.2 m, parallel stalls 2.3 m
+                depth = 52.0 if (w / 2 - 52 >= lane_o + 7.5 and not ch['med']) else 23.0 if w / 2 - 23 >= lane_o + 13 else 0
+                ch['park'] = depth
+                if depth:
+                    for s_ in (-1, 1):
+                        cline(ch, m0 + 20, m1 - 20, s_ * (w / 2 - depth), 1.0, WHITE)
+                        t = m0 + 22
+                        while t < m1 - 22 - (depth if depth > 30 else 0):
+                            if depth > 30:
+                                q0, q1 = pt(ch, t + depth * s_ * 0.0, s_ * (w / 2 - depth)), pt(ch, t + depth, s_ * (w / 2 - 0.5))
+                                dx_, dy_ = q1[0] - q0[0], q1[1] - q0[1]; l_ = math.hypot(dx_, dy_) or 1
+                                nx_, ny_ = -dy_ / l_ * 0.5, dx_ / l_ * 0.5
+                                paint([(q0[0] - nx_, q0[1] - ny_), (q1[0] - nx_, q1[1] - ny_), (q1[0] + nx_, q1[1] + ny_), (q0[0] + nx_, q0[1] + ny_)], WHITE)
+                                t += 37
+                            else:
+                                paint([pt(ch, t - 0.5, s_ * (w / 2 - 23)), pt(ch, t + 0.5, s_ * (w / 2 - 23)), pt(ch, t + 0.5, s_ * (w / 2 - 14)), pt(ch, t - 0.5, s_ * (w / 2 - 14))], WHITE)
+                                t += 62
             t = m0 + R.uniform(60, 260)
             while t < m1 - 40:
-                lat = R.choice((-1, 1)) * R.uniform(6, max(7, w / 2 - 28))
+                lat = R.choice((-1, 1)) * R.uniform(22, max(23, w / 2 - 28))
                 disc(*pt(ch, t, lat), 3.4, (0.045, 0.045, 0.05)); stat['manhole'] += 1
                 t += R.uniform(380, 900)
         for L, o in ((LA, ch['pts'][0]), (LB, ch['pts'][-1])):
@@ -355,8 +411,79 @@ def build(BF, W, Hat, bsolid, CORE, lin, EXTRA, sig_nodes, repo):
                 line((o[0] + dd[0] * (L['bar'] + 2.2), o[1] + dd[1] * (L['bar'] + 2.2)), rgt, 1.0, w / 2 - 2, 0, 4.4, WHITE)
                 stat['stopbar'] += 1
 
+    # ---------- kerbside and median trees: the detected crowns (tools/trees.py detect) that stand over a street ----------
+    used = []
+    rf = repo + '/data/dossier/trees_raw.json'
+    if os.path.exists(rf):
+        raw = json.load(open(rf))['trees']
+        grid = {}
+        for ci, ch in enumerate(CHAINS):
+            for k in range(len(ch['pts']) - 1):
+                a_, b_ = ch['pts'][k], ch['pts'][k + 1]
+                for gx in range(int(min(a_[0], b_[0]) // 300) - 1, int(max(a_[0], b_[0]) // 300) + 2):
+                    for gy in range(int(min(a_[1], b_[1]) // 300) - 1, int(max(a_[1], b_[1]) // 300) + 2):
+                        grid.setdefault((gx, gy), []).append((ci, k))
+        placed = {}
+        for ti, (X, Y, crown, ever, tall) in enumerate(raw):
+            best = None
+            for ci, k in grid.get((int(X // 300), int(Y // 300)), ()):
+                ch = CHAINS[ci]; a_, b_ = ch['pts'][k], ch['pts'][k + 1]
+                dx_, dy_ = b_[0] - a_[0], b_[1] - a_[1]; l2 = dx_ * dx_ + dy_ * dy_ or 1
+                f = max(0.0, min(1.0, ((X - a_[0]) * dx_ + (Y - a_[1]) * dy_) / l2))
+                qx, qy = a_[0] + dx_ * f, a_[1] + dy_ * f
+                dq = math.hypot(X - qx, Y - qy)
+                if best is None or dq < best[0]:
+                    lat = ((X - qx) * -dy_ + (Y - qy) * dx_) / math.sqrt(l2)
+                    best = (dq, ci, ch['cum'][k] + f * math.sqrt(l2), lat)
+            if not best:
+                continue
+            dq, ci, t, lat = best
+            ch = CHAINS[ci]; w = ch['w']; side = 1 if lat > 0 else -1
+            if abs(lat) > w / 2 + (ch['sw'] if ch['core'] else STRIP + 2):
+                continue                                   # in a yard or a lot: tools/trees.py places it where it is
+            kind = 5 if ever else (3 if crown < 20 else 2 if crown < 25 and ch['core'] else 0 if crown < 40 else 1)
+            sc = round(max(0.6, min(1.35, crown / (40, 62, 18, 26, 44, 40)[kind] * 1.1)), 2)
+            if any(ma <= t <= mb for ma, mb in ch['med']) and abs(lat) < 24:
+                q = pt(ch, t, 0)
+                if all(abs(t - t2) > 45 for t2 in placed.setdefault((ci, 0), [])):
+                    placed[(ci, 0)].append(t); trees.append([round(q[0]), round(q[1]), sc, kind]); stat['medtree'] = stat.get('medtree', 0) + 1
+                used.append(ti); continue
+            run = ch.get('runR' if side > 0 else 'runL')
+            if abs(lat) < w / 2 - 50 or not run or not (run[0] + 12 < t < run[1] - 12):
+                used.append(ti) if abs(lat) < w / 2 else None   # over the travel lanes or in a junction: no place to stand
+                continue
+            off = 9.0 if ch['core'] else STRIP / 2 + 1
+            x, y = pt(ch, t, side * (w / 2 + off))
+            used.append(ti)
+            if bsolid(x, y) or any(abs(t - t2) < 45 for t2 in placed.setdefault((ci, side), [])):
+                continue
+            placed[(ci, side)].append(t)
+            trees.append([round(x), round(y), sc, kind])
+            stat['kerbtree'] = stat.get('kerbtree', 0) + 1
+            if ch['core']:
+                q = [pt(ch, t + u, side * (w / 2 + 9 + v)) for u, v in ((-7, -6), (7, -6), (7, 6), (-7, 6))]
+                BF.quad(plainb(x, y), *[(px, Hat(px, py) + KH + 0.1, py) for px, py in (q if side > 0 else q[::-1])], (0, 0, 1, 1), (0.09, 0.075, 0.06))
+                stat['pit'] += 1
+    EXTRA['used'] = used
+
+    # ---------- median islands (real kerb loops from the city's kerb lines): raised, planted, with trees ----------
+    soil = (0.10, 0.15, 0.06)
+    for poly, ch, tc, half in MED:
+        cx, cy = sum(q[0] for q in poly) / len(poly), sum(q[1] for q in poly) / len(poly)
+        pts_ = [tuple(q) for q in poly]
+        if math.hypot(pts_[0][0] - pts_[-1][0], pts_[0][1] - pts_[-1][1]) < 2:
+            pts_ = pts_[:-1]
+        for k in range(len(pts_)):
+            a_, b_ = pts_[k], pts_[(k + 1) % len(pts_)]
+            face(a_, b_); face(b_, a_)
+            ins = lambda q: (q[0] + (cx - q[0]) * 0.12, q[1] + (cy - q[1]) * 0.12)
+            ia, ib = ins(a_), ins(b_)
+            top(plainb(*a_), [a_, b_, ib, ia], kerbtop)
+            BF.tri(plainb(cx, cy), [(ia[0], Hat(*ia) + KH + 0.6, ia[1]), (ib[0], Hat(*ib) + KH + 0.6, ib[1]), (cx, Hat(cx, cy) + KH + 1.2, cy)], [(0, 0), (1, 0), (0, 1)], tuple(v * R.uniform(0.9, 1.1) for v in soil))
+        stat['median'] = stat.get('median', 0) + 1
+
     # ---------- what the game stands up ----------
-    out = dict(r={}, signals=[], stops=[], names=NAMES)
+    out = dict(r={}, signals=[], stops=[], names=NAMES, xw=[], stopleg=[])
     for ni, legs in LEG.items():
         if ni in CTRL:
             out['r'][ni] = round(max(L['bar'] for L in legs) + 4)
@@ -365,6 +492,7 @@ def build(BF, W, Hat, bsolid, CORE, lin, EXTRA, sig_nodes, repo):
         n = NODES[ni]; legs = LEG[ni]
         if kind == 'stop':
             for L in sel:
+                out['stopleg'].append([ni, L['ch']['ids'][1] if L['end'] == 0 else L['ch']['ids'][-2]])
                 dd = L['d']; h = (-dd[0], -dd[1]); rgt = (-h[1], h[0])
                 x, y = n[0] + dd[0] * (L['bar'] + 4) + rgt[0] * (L['w'] / 2 + 7), n[1] + dd[1] * (L['bar'] + 4) + rgt[1] * (L['w'] / 2 + 7)
                 if bsolid(x, y):
@@ -374,6 +502,10 @@ def build(BF, W, Hat, bsolid, CORE, lin, EXTRA, sig_nodes, repo):
             continue
         S = dict(n=ni, x=n[0], y=n[1], ap=[], cab=None)
         for L in legs:
+            # the crosswalk over this leg, kerb to kerb: people cross it while the traffic running alongside them has green
+            cd = L['d']; cr = (-cd[1], cd[0]); ct = L['s0'] + 20
+            out['xw'].append([round(n[0] + cd[0] * ct + cr[0] * (L['w'] / 2 + 9)), round(n[1] + cd[1] * ct + cr[1] * (L['w'] / 2 + 9)),
+                              round(n[0] + cd[0] * ct - cr[0] * (L['w'] / 2 + 9)), round(n[1] + cd[1] * ct - cr[1] * (L['w'] / 2 + 9)), grp(cr)])
             dd = L['d']; h = (-dd[0], -dd[1]); rgt = (-h[1], h[0])           # h: the way traffic on this leg heads into the junction
             opp = next((M for M in legs if M['d'][0] * h[0] + M['d'][1] * h[1] > 0.7), None)
             cross = [M for M in legs if abs(M['d'][0] * dd[0] + M['d'][1] * dd[1]) < 0.7]
@@ -416,8 +548,40 @@ def build(BF, W, Hat, bsolid, CORE, lin, EXTRA, sig_nodes, repo):
     import numpy as np
     R_, G_ = np.asarray(newr).copy(), np.asarray(g0).copy()
     old = np.asarray(r0)
+    st_o = Image.new('L', (mk.width * 2, mk.height * 2), 0); st_i = Image.new('L', (mk.width * 2, mk.height * 2), 0)
+    do, di = ImageDraw.Draw(st_o), ImageDraw.Draw(st_i)
+    for ch in CHAINS:
+        if not ch['core']:
+            ra, rb = ch.get('runR', (0, 0)), ch.get('runL', (0, 0))
+            t0_, t1_ = max(ra[0], rb[0]), min(ra[1], rb[1])
+            if t1_ - t0_ > 20:
+                pl = [(x / 5.0, y / 5.0) for x, y in [pt(ch, t, 0) for t in samples(ch, t0_, t1_, 60.0)]]
+                do.line(pl, fill=255, width=int(round((ch['w'] + 2 * STRIP) / 5.0))); di.line(pl, fill=255, width=int(round((ch['w'] + 2) / 5.0)))
+    strip = (np.asarray(st_o.resize(mk.size, Image.BOX)) > 128) & (np.asarray(st_i.resize(mk.size, Image.BOX)) < 128)
+    G_[strip & (R_ < 100)] = 0
     G_[(old > 100) & (R_ < 100) & (G_ < 128)] = 128        # asphalt the old mask had where there is no street: treat as paved ground
     Image.merge('RGB', (Image.fromarray(R_), Image.fromarray(G_), b0)).save(repo + '/data/mask.png', optimize=True)
     json.dump(out, open(repo + '/data/street.json', 'w'), separators=(',', ':'))
+    road_t = np.asarray(newr.resize((mk.width // 2, mk.height // 2), Image.BOX)) > 110
+    band = Image.new('L', (mk.width, mk.height), 0)
+    db = ImageDraw.Draw(band)
+    for ch in CHAINS:
+        db.line([(x / 10.0, y / 10.0) for x, y in ch['pts']], fill=255, width=int(round((ch['w'] + 2 * ch['sw']) / 10.0)), joint='curve')
+    walk_t = (np.asarray(band.resize((mk.width // 2, mk.height // 2), Image.BOX)) > 110) & ~road_t
+    paved_t = np.asarray(g0.resize((mk.width // 2, mk.height // 2), Image.BOX)) >= 100
+
+    def tiles(mp):
+        """rewrite the road and sidewalk tiles of the collision map (2 m tiles) from this geometry; buildings and water stay"""
+        m = np.asarray(mp).copy()
+        h_, w_ = min(m.shape[0], road_t.shape[0]), min(m.shape[1], road_t.shape[1])
+        v = m[:h_, :w_]
+        keep = (v == 120) | (v == 0)
+        was = (v == 60) | (v == 90)
+        v[was & ~keep] = np.where(paved_t[:h_, :w_], 180, 30)[was & ~keep]
+        v[walk_t[:h_, :w_] & ~keep] = 90
+        v[road_t[:h_, :w_] & ~keep] = 60
+        m[:h_, :w_] = v
+        return Image.fromarray(m).copy()
+    out_tiles[0] = tiles
     print('streets:', stat, '| signals', len(out['signals']), 'stop signs', len(out['stops']), 'street trees', len(trees))
-    return out
+    return out, out_tiles[0]
