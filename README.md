@@ -215,6 +215,6 @@ The game map is tied to State Plane coordinates by a fit against the city footpr
 
 Not available from here: the assessor's per-structure page (year built, storeys, construction class) refuses automated requests, so storeys come from LiDAR height instead. Aerials look straight down, so wall material is only certain where a wall edge shows or a street photo exists; `tools/blocks.py` marks each wall as seen, from a record, or inferred.
 
-Hewitt Ave from Colby to Oakes is the first stretch set this way (48 footprints, 22 buildings). `tools/citygen.py` gained `hft` (measured height), `shopon` (which sides get a storefront), `blank` (windowless party and alley walls) and `pent` (rooftop penthouse).
+Hewitt Ave from Colby to Oakes is the first stretch set this way (48 footprints, 23 buildings). `tools/citygen.py` gained `hft` (measured height), `shopon` (which sides get a storefront), `blank` (windowless party and alley walls) and `pent` (rooftop penthouse).
 
 `tools/shot.py OUT.png "p=x,h,y&t=x,h,y"` takes stills of `data/city.glb` through `tools/preview.html` in headless Chrome, for before and after checks.
