@@ -77,14 +77,15 @@ class Bufs:
             C.extend(col)
         I.extend((n, n + 1, n + 2))
 
-    def quad(self, B, a, b, c, d, uv, col):
+    def quad(self, B, a, b, c, d, uv, col, bot=1.0):
+        # bot darkens the first two corners (the foot of a wall) so buildings sit in a soft contact shade
         P, U, C, I = B
         n = len(P) // 3
         u0, v0, u1, v1 = uv
-        for q, u in ((a, (u0, v0)), (b, (u1, v0)), (c, (u1, v1)), (d, (u0, v1))):
+        for k, (q, u) in enumerate(((a, (u0, v0)), (b, (u1, v0)), (c, (u1, v1)), (d, (u0, v1)))):
             P.extend(q)
             U.extend(u)
-            C.extend(col)
+            C.extend(col if k > 1 or bot == 1.0 else tuple(v * bot for v in col))
         I.extend((n, n + 1, n + 2, n, n + 2, n + 3))
 
     def box(self, B, cx, cy, cz, sx, sy, sz, col, ang=0.0):
@@ -469,7 +470,7 @@ for i, b in enumerate(BLD):
             if ln < 30:
                 BF.quad(WB, (a[0], z0, a[1]), (c[0], z0, c[1]), (c[0], z0 + sh, c[1]), (a[0], z0 + sh, a[1]), (0.0, 0.0, 0.0, 0.0), tuple(v * 0.8 for v in tint))
             else:
-                BF.quad(SB, (a[0], z0, a[1]), (c[0], z0, c[1]), (c[0], z0 + sh, c[1]), (a[0], z0 + sh, a[1]), (0, 0, ns, 1), WHITE)
+                BF.quad(SB, (a[0], z0, a[1]), (c[0], z0, c[1]), (c[0], z0 + sh, c[1]), (a[0], z0 + sh, a[1]), (0, 0, ns, 1), WHITE, 0.7)
             z0 += sh
         ua, ub, vs = wall_uv(wm, ln, max(hh, 8))
         st = L.get('stripe')
@@ -478,7 +479,7 @@ for i, b in enumerate(BLD):
             t0, t1 = q / nseg, (q + 1) / nseg
             sa_, sc_ = (a[0] + (c[0] - a[0]) * t0, a[1] + (c[1] - a[1]) * t0), (a[0] + (c[0] - a[0]) * t1, a[1] + (c[1] - a[1]) * t1)
             BF.quad(WB, (sa_[0], z0, sa_[1]), (sc_[0], z0, sc_[1]), (sc_[0], rt, sc_[1]), (sa_[0], rt, sa_[1]),
-                    (ua + (ub - ua) * t0, 0.0, ua + (ub - ua) * t1, (rt - z0) * vs), st[0] if st and (q + k) % (st[2] if len(st) > 2 else 2) == (st[2] if len(st) > 2 else 2) - 1 else tint)
+                    (ua + (ub - ua) * t0, 0.0, ua + (ub - ua) * t1, (rt - z0) * vs), st[0] if st and (q + k) % (st[2] if len(st) > 2 else 2) == (st[2] if len(st) > 2 else 2) - 1 else tint, 0.9 if sh else 0.72)
         onx, ony = (py[j] - py[k]) / ln, -(px[j] - px[k]) / ln
         if L.get('awn') and sh and ln > 60:
             na = max(1, round(ln / 80))

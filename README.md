@@ -154,3 +154,11 @@ Done so far:
 
 The excavator is a Meshy-generated model packed by `tools/prop_meshy.py`. The recording is 220 px wide, so signs and window detail cannot be read from it; storeys, colours and massing can.
 
+## Day and night
+
+The clock in the corner now drives the light. One game minute passes per second, so a full day takes 24 minutes; the game starts at 09:00. The sun rises in the east at 06:00, crosses the southern sky and sets in the west at 20:00, so shadows swing and lengthen through the day. After dark a dim blue moonlight takes over, the sky and haze darken, about four in ten windows light up, street lamp heads glow and the lamps nearest the player cast real light on the pavement (five on desktop, two on phones). Interiors keep their own lighting.
+
+Add `?hour=22` (any hour, decimals allowed) to the address to start at that time.
+
+Building walls are also shaded darker toward the ground so they sit on the street instead of floating on it (`bot` in `tools/citygen.py`).
+
