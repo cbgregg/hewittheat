@@ -2,7 +2,7 @@ import * as THREE from 'three';
 import {GLTFLoader} from 'three/addons/loaders/GLTFLoader.js';
 import {clone as skClone} from 'three/addons/utils/SkeletonUtils.js';
 /* Downtown Everett built from City of Everett GIS data: street centerlines, building footprints, 2 ft contours, parks, bus stops, 2022 aerial imagery. 10 units = 1 m, one tile = 2 m. */
-const PI=Math.PI,T=20,DV='?v=1125j';
+const PI=Math.PI,T=20,DV='?v=1125k';
 let MW=0,MH=0,WW=0,WH=0,map=new Uint8Array(1),HMAP=null,gw=0,gh=0,GS=80,WORLD=null;
 const WATER=0,GRASS=1,ROAD=2,WALK=3,BLDG=4,PARK=5,CONC=6,HOUSE=7;
 const SOL=[1,0,0,0,1,0,0,0];
@@ -109,17 +109,18 @@ function spawnPed(any){if(Math.random()<0.3&&STOPS.length)for(let t=0;t<12;t++){
 function moveEnt(e,dx,dy,r){let m=false;const ok=(x,y)=>!(solidAt(x-r,y-r)||solidAt(x+r,y-r)||solidAt(x-r,y+r)||solidAt(x+r,y+r));
  if(ok(e.x+dx,e.y)){e.x+=dx;m=true;}if(ok(e.x,e.y+dy)){e.y+=dy;m=true;}return m;}
 function carStep(c,thr,steer,hb,dt){
- if(c.dead)thr=0;const pl=c.drv==='player',co=Math.cos(c.a),si=Math.sin(c.a);let v=c.v,lat=c.lat||0;
- if(thr>0)v+=thr*c.acc*dt*(1-clamp(v/c.max,0,1)*0.55);else if(thr<0){if(v>5)v+=thr*390*dt;else v+=thr*c.acc*0.7*dt;}
+ if(c.dead)thr=0;const pl=c.drv==='player',bike=c.model==='moto',co=Math.cos(c.a),si=Math.sin(c.a);let v=c.v,lat=c.lat||0;
+ if(pl){const r=(steer===0?8:5.5)*dt;c.st=(c.st||0)+clamp(steer-(c.st||0),-r,r);steer=c.st;}
+ if(thr>0)v+=thr*c.acc*dt*(pl?1.3-clamp(v/c.max,0,1)*0.95:1-clamp(v/c.max,0,1)*0.55);else if(thr<0){if(v>5)v+=thr*(pl?560:390)*dt;else v+=thr*c.acc*0.7*dt;}
  v-=v*(c.dead?3:0.22)*dt;if(thr===0)v-=Math.sign(v)*Math.min(Math.abs(v),38*dt);
  if(hb)v-=Math.sign(v)*Math.min(Math.abs(v),pl?230:520)*dt*(pl?1:1);
  const tt=tileAt(c.x,c.y);if(tt===GRASS||tt===PARK){v*=1-1.0*dt;}
  v-=95*((GT&&c.gy!=null)?clamp(c.gsl||0,-0.3,0.3):(Hat(c.x+co*20,c.y+si*20)-Hat(c.x-co*20,c.y-si*20))/40)*dt;
  v=clamp(v,-c.max*0.35,c.max);
  let vx=co*v-si*lat,vy=si*v+co*lat;
- const na=c.a+steer*dt*(pl?(hb?3.4:2.5)*clamp(v/105,-1,1)*(1-clamp(Math.abs(v)/c.max,0,1)*0.42):2.7*clamp(v/85,-1,1));
+ const lock=0.6-0.43*clamp(Math.abs(v)/c.max,0,1),na=c.a+(pl?clamp(v/(c.l*0.62)*Math.tan(steer*lock)*(hb?1.4:1)*(bike?1.15:1),-3.3,3.3)*dt:steer*dt*2.7*clamp(v/85,-1,1));
  const nc=Math.cos(na),ns=Math.sin(na);v=vx*nc+vy*ns;lat=-vx*ns+vy*nc;
- lat*=Math.exp(-(pl?(hb?1.1:(tt===GRASS||tt===PARK?2.6:5.2)):10)*dt);c.slip=Math.abs(lat);
+ lat*=Math.exp(-(pl?(hb?1.25:(tt===GRASS||tt===PARK?3.0:(bike?9.5:7.4))*(Math.abs(lat)>75?0.5:1)):10)*dt);c.slip=Math.abs(lat);
  vx=nc*v-ns*lat;vy=ns*v+nc*lat;c.v=v;c.lat=lat;
  const nx=c.x+vx*dt,ny=c.y+vy*dt;
  if(carBlocked(c.x,c.y,c.a,c)||!carBlocked(nx,ny,na,c)){c.x=nx;c.y=ny;c.a=na;return;}
@@ -323,7 +324,7 @@ function startStoryMode(fresh){if(MODE==='free'&&storyOwn){P.own=storyOwn.own;P.
  PRE=null;RAINON=false;
  {const cp=ST<STORY.length?loadCP(STORY[ST]):null;if(cp){if(ST===0){RAINON=true;TOFF=((22.7*60-540-time)%1440+1440)%1440;}resumeCP(STORY[ST],cp,true);say('Checkpoint restored.',4);return;}}
  if(ST===0&&STORY.length){const ch=STORY[0],j=lm('Snohomish County Courthouse');RAINON=true;TOFF=((22.7*60-540-time)%1440+1440)%1440;
-  if(j){P.x=j.curb.x;P.y=j.curb.y;if(solidAt(P.x,P.y)){P.x=j.door.x;P.y=j.door.y;}cam.x=P.x;cam.y=P.y;if(VSPEC.moto&&VSPEC.moto.tpl){const bk=makeCar(P.x+26,P.y+10,0,'civ','moto');bk.keep=true;bk.park=true;bk.max=330;bk.acc=300;}}
+  if(j){P.x=j.curb.x;P.y=j.curb.y;if(solidAt(P.x,P.y)){P.x=j.door.x;P.y=j.door.y;}cam.x=P.x;cam.y=P.y;if(VSPEC.moto&&VSPEC.moto.tpl){const bk=makeCar(P.x+26,P.y+10,PI,'civ','moto');bk.keep=true;bk.park=true;bk.max=330;bk.acc=300;}}
   if(ch.pre){const g=ch.ped;let best=null,bd=1e9;for(const l of DN.lit){const d=dist(l.x,l.z,g.x,g.y);if(d<bd&&!solidAt(l.x+12,l.z+8)){bd=d;best=l;}}if(best&&bd<1400){g.x=best.x+12;g.y=best.z+8;}
    const o=mkActor('olsen',g.x-13,g.y+7,g.a);o.actor=0;CONTACTS.push(o);g.wave=o.wave=true;PRE={g,o,seen:false,done:false};
    if(!PRE_L){PRE_L=new THREE.PointLight(0xffd9a0,0,620,1.7);scene.add(PRE_L);}PRE_L.position.set(g.x-6,Hg(g.x,g.y)+62,g.y+3);PRE_L.intensity=11000;PRE_L.visible=true;}}
@@ -505,7 +506,8 @@ function update(dt){
  strT-=dt;if(strT<=0){strT=0.4;STREET=OOB(P.x,P.y)?nearPlace():streetAt(P.x,P.y)||(tileAt(P.x,P.y)===PARK?'Park':tileAt(P.x,P.y)===CONC?'Waterfront':'Everett');}
  spotT-=dt;if(spotT<=0){spotT=0.5;streamSpots(false);}
  // camera: free look from the right stick / mouse / right-side drag; it drifts back behind you after a moment
- if(lookT>1.4){if(P.car)yaw+=adiff(P.car.a+(P.car.v<-25?PI:0),yaw)*Math.min(1,dt*2.6);else if(P.mov&&!P.dead&&!AIM){const d=adiff(P.a,yaw);if(Math.abs(d)<2.4)yaw+=d*Math.min(1,dt*1.2);}
+ if(P.car&&lookT>0.35){const c=P.car;yaw+=adiff(c.a+(c.v<-25?PI:0)+(c.st||0)*0.16,yaw)*Math.min(1,dt*(3.0+Math.abs(c.v)/80));}
+ if(lookT>1.4){if(P.car){}else if(P.mov&&!P.dead&&!AIM){const d=adiff(P.a,yaw);if(Math.abs(d)<2.4)yaw+=d*Math.min(1,dt*1.2);}
   pitch+=((P.car?0.24:0.2)-pitch)*Math.min(1,dt*1.5);}
  cam.x=P.x;cam.y=P.y;
 }
@@ -635,7 +637,7 @@ function buildStatic2(){
  const it=new THREE.CanvasTexture(ic);it.wrapS=it.wrapT=THREE.RepeatWrapping;it.colorSpace=THREE.SRGBColorSpace;it.anisotropy=4;MAT.house=S({map:ht});MAT.ind=S({map:it});MAT.shop=S({map:ltex('data/shop.jpg',1)});for(let i=0;i<5;i++)MAT['f'+i]=S({map:ltex('data/f'+i+'.jpg',1)});for(let i=0;i<6;i++)MAT['roof'+i]=roofM[i];
  cells.forEach(b=>{if(!b.p.length)return;const m=new THREE.Mesh(geoOf(b),MAT[b.k]);m.castShadow=true;m.receiveShadow=true;scene.add(m);});
  if(CITY){CITY.traverse(o=>{if(o.isMesh){o.castShadow=true;o.receiveShadow=true;const m=o.material;m.metalness=0;m.roughness=0.86;if(m.map)m.map.anisotropy=LOW?4:8;
-   if(m.map&&!m.userData.nm){m.userData.nm=1;const nt=new THREE.TextureLoader().load('tex/b/'+m.name+'_n.jpg');nt.flipY=false;nt.wrapS=nt.wrapT=THREE.RepeatWrapping;nt.repeat.copy(m.map.repeat);nt.offset.copy(m.map.offset);nt.rotation=m.map.rotation;nt.center.copy(m.map.center);nt.anisotropy=LOW?2:4;m.normalMap=nt;m.normalScale=new THREE.Vector2(0.9,0.9);}
+   if(m.map&&!m.userData.nm&&!LOW){m.userData.nm=1;const nt=new THREE.TextureLoader().load('tex/b/'+m.name+'_n.jpg');nt.flipY=false;nt.wrapS=nt.wrapT=THREE.RepeatWrapping;nt.repeat.copy(m.map.repeat);nt.offset.copy(m.map.offset);nt.rotation=m.map.rotation;nt.center.copy(m.map.center);nt.anisotropy=LOW?2:4;m.normalMap=nt;m.normalScale=new THREE.Vector2(0.9,0.9);}
    if(/^(f_|shop_)/.test(m.name)&&!/metal|cmu|lap/.test(m.name)&&!m.userData.gl){m.userData.gl=1;m.onBeforeCompile=sh=>{sh.uniforms.uNight=NIGHT;sh.fragmentShader=sh.fragmentShader.replace('#include <common>','#include <common>\nfloat glassK=0.0;uniform float uNight;')
      .replace('#include <map_fragment>','#include <map_fragment>\n{vec3 tc=texture2D(map,vMapUv).rgb;glassK=smoothstep(0.03,0.14,tc.b-tc.r)*smoothstep(0.75,0.45,tc.r);}')
      .replace('#include <roughnessmap_fragment>','#include <roughnessmap_fragment>\nroughnessFactor=mix(roughnessFactor,0.06,glassK);')
@@ -653,6 +655,8 @@ function buildStatic2(){
       diffuseColor.rgb=mix(diffuseColor.rgb,rc*mix(0.22,0.05,uNight),glassK);
       totalEmissiveRadiance+=rc*vec3(1.0,0.80,0.52)*glassK*lit*2.6;
       normal=normalize(mix(normal,nonPerturbedNormal,glassK));}
+     #else
+     {vec2 wc=floor(vMapUv*2.0);float on=step(0.58,fract(sin(dot(wc,vec2(12.9898,78.233)))*43758.5453));totalEmissiveRadiance+=vec3(1.0,0.74,0.42)*glassK*on*uNight*2.4;}
      #endif`);};}}});scene.add(CITY);}
  // trees (parks, plus a thin scatter on open grass)
  const M4=()=>new THREE.Matrix4(),Q=new THREE.Quaternion(),UP=new THREE.Vector3(0,1,0),tb=B_(),gc=hex('#2f5a34'),tc=hex('#4a3526');
@@ -802,7 +806,7 @@ function init3D(){
 function initMarkers(){GV.forEach((gv,i)=>MK['g'+i]=mkMarker(gv.type==='race'?'#ff5ad0':'#ffd23f',gv.type==='courier'?'COURIER':gv.type==='race'?'RACE':'EXPORT'));PKG.forEach(p=>{p.m=box(9,9,9,0,0,0,0,null,bmat('#40e0ff'));p.m.castShadow=false;scene.add(p.m);});
  MK.shop=mkMarker('#ff8a30','BODY SHOP');MK.pawn=mkMarker('#7ad06a','AMMO');MK.hosp=mkMarker('#ff5a6a','HEAL');MK.tgt=mkMarker('#ffe45a','▼');MK.story=mkMarker('#40e0ff','STORY');}
 /* --- optional: Google Photorealistic 3D Tiles. Needs the player's own Map Tiles API key and a normal web host (blocked inside the Claude artifact). --- */
-const BUILD='Nov 25 11:10pm - Performance';
+const BUILD='Nov 26 12:05am - Driving';
 /* ---------- film pass: HDR scene -> sharpen, glow, tone map, grade, grain ---------- */
 let FX=null;const GTKU={value:1};
 function initFX(){try{const sz=ren.getDrawingBufferSize(new THREE.Vector2()),rt=new THREE.WebGLRenderTarget(sz.x,sz.y,{samples:LOW?0:4,type:THREE.HalfFloatType});rt.depthTexture=new THREE.DepthTexture(sz.x,sz.y);
@@ -1034,7 +1038,7 @@ function buildBig(){if(bigmap)return bigmap;bigmap=document.createElement('canva
 /* ---------- BOOT ---------- */
 function reset(){cars=[];peds=[];fx=[];picks=[];stains=[];pts=0;stars=0;M=null;for(const s of SPOTS){s.on=false;s.taken=false;}
  const s=lm('Everett Station');P.x=s.curb.x+T*5;P.y=s.curb.y;if(solidAt(P.x,P.y)){P.x=s.door.x;P.y=s.door.y;}P.hp=100;P.car=null;P.dead=0;cam.x=P.x;cam.y=P.y;yaw=PI;
- streamSpots(true);for(let i=0;i<22;i++)spawnTraffic(i===3?'taxi':i===7?'bus':'civ',true);for(let i=0;i<22;i++)spawnPed(true);}
+ streamSpots(true);for(let i=0;i<(LOW?12:22);i++)spawnTraffic(i===3?'taxi':i===7?'bus':'civ',true);for(let i=0;i<(LOW?10:22);i++)spawnPed(true);}
 function resize(){DPR=Math.min(window.devicePixelRatio||1,2);W=window.innerWidth;H=window.innerHeight;hc.width=W*DPR;hc.height=H*DPR;ren.setPixelRatio(Math.min(window.devicePixelRatio||1,LOW?1.25:2));ren.setSize(W,H,false);cam3.aspect=W/H;cam3.fov=W<H?74:58;cam3.updateProjectionMatrix();}
 let last=0;
 let fpsN=0,fpsT=0,qual=2;
