@@ -99,7 +99,7 @@ All from Sketchfab under CC BY 4.0, modified for the game (re-based, scaled, tex
 | Fire Hydrant [Low Poly] | Islide |
 | Low-Poly Wooden Bench | Memorie |
 | Photorealistic Trash Can (LOW POLY) | Derfmode |
-| Low Poly Male, Low Poly Female (pedestrians, Marge, the lot attendant; re-dressed by `tools/people_prep.py`) | Loves_Art |
+| Low Poly Male, Low Poly Female (no longer shown; kept as spare models, re-dressed by `tools/people_prep.py`) | Loves_Art |
 
 `tools/sketchfab_dl.py` and `tools/sketchfab_prep.py` rebuild them; the Sketchfab token is read from the `SKF` environment variable and is not stored in this repository.
 
@@ -111,7 +111,7 @@ Two chapters now open the story: WELCOME BACK (the booted car and the walk to Pr
 
 Danny, Marge, Pruitt and the lot attendant use custom ElevenLabs voices designed from written briefs (saved on the account as "HH Danny" and so on), and every existing line by those characters was re-recorded with them. The other characters still use their earlier voices. `tools/voices_design.py` and `tools/voices_synth.py` rebuild the audio; the key is read from the `ELEVEN` environment variable.
 
-Characters built on the avatar rig open their mouths in time with their lines.
+Mouths follow the voice audio (see Characters below).
 
 ## Interior sets
 
@@ -120,3 +120,13 @@ Characters built on the avatar rig open their mouths in time with their lines.
 `models/set_chamber.glb` is the council chamber (`tools/build_chamber.py`). A chapter can also stage its ending in a set (`"oset"`) and its MEANWHILE scene in one (`"pset"` with `"pat"` naming the landmark). Sets carry their own lights and the sun is dimmed while one is showing.
 
 All nine story voices are now custom designs ("HH" voices on the ElevenLabs account); all 133 story lines use them.
+
+## Characters
+
+The player, the nine story characters, the police officer and four pedestrians are realistic textured people generated with Meshy (text to 3D, then Meshy's rigging and its walk and run clips). Files are `models/hh_<name>.b64.txt`, about 12,000 triangles and one 1024 px texture each.
+
+`tools/people_meshy.py MESHY_OUT_DIR` packs them: it merges the walk and run clips into the rigged model, recomputes smooth normals, and builds a `mouthOpen` shape for each face by lowering the front of the head below that face's lip line (the per-face lip positions are in `MOUTH` in the script). The standing pose is the walk clip averaged over its length. The Meshy key is read from the `MESHY` environment variable when generating and is not stored in this repository.
+
+Mouths are driven by the voice audio: each line's loudness is measured 30 times a second and sets how far the speaker's mouth opens, so it opens on words and closes in pauses and when the line ends. A line with no audio falls back to a generic talking motion.
+
+Only the player, the officer and the four pedestrians load at start. A story character's model loads when its chapter becomes current or when the character is first on screen; a pedestrian stands in for the moment until it arrives.
