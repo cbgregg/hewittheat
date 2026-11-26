@@ -318,6 +318,9 @@ for br in getattr(blocks, 'BRIDGES', []):
         INFO[i] = (sum(p_[0] for p_ in P) / len(P), sum(p_[1] for p_ in P) / len(P), abs(area2([p_[0] for p_ in P], [p_[1] for p_ in P])) / 2)
 for i, d in blocks.B.items():
     ovr(i, **blk(d))
+if os.path.exists(REPO + '/data/overrides.json'):
+    for k_, d_ in json.load(open(REPO + '/data/overrides.json')).items():
+        ovr(int(k_), **blk(d_))
 GONE = set(blocks.GONE)
 ADDED = []
 for d in blocks.ADD:
@@ -379,6 +382,8 @@ def look(i):
 
 
 BF = Bufs()
+LOOKS = {}
+hx = lambda c: '#%02x%02x%02x' % tuple(int(255 * (1.055 * max(v, 0) ** (1 / 2.4) - 0.055 if v > 0.0031308 else 12.92 * v) + 0.5) for v in c[:3])
 stats = {}
 tris_total = 0
 for i, b in enumerate(BLD):
@@ -401,6 +406,7 @@ for i, b in enumerate(BLD):
     base, top = lo - 4, gm + h
     r = random.Random(i * 104729 + 7)
     stats[L['wall']] = stats.get(L['wall'], 0) + 1
+    LOOKS[i] = [L['wall'], hx(L['tint']), L['roof'], hx(L['rtint']), round(h / FLH, 1), L.get('shop') or '', 1 if i in OVR else 0, round(cx), round(cy), kind]
     plain = BF.get(cx, cy, 'plain')
     if L['special'] == 'dome':
         # the port's storage dome: low ring wall and a ribbed spherical cap
@@ -871,4 +877,5 @@ with open(OUT, 'wb') as f:
 print('buildings', len(BLD), 'meshes', len(meshes), 'tris', tris_total, 'bytes', 20 + len(js) + 8 + len(bin_))
 print('walls', sorted(stats.items(), key=lambda t: -t[1]))
 print('named', sorted(sum((v['names'] for v in OVR.values()), [])))
+json.dump(LOOKS, open(REPO + '/data/buildings.json', 'w'), separators=(',', ':'))
 json.dump({'materials': mats, 'named': {str(k): v['names'] for k, v in OVR.items() if v['names']}}, open(OUT.replace('.glb', '_info.json'), 'w'))

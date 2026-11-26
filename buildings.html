@@ -1,0 +1,72 @@
+<!DOCTYPE html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Hewitt Heat · Building browser</title>
+<style>
+*{box-sizing:border-box}body{margin:0;font:14px/1.4 system-ui,sans-serif;background:#14161a;color:#e8e6e0;display:flex;flex-direction:column;height:100vh}
+header{display:flex;gap:8px;align-items:center;padding:8px 10px;background:#1d2026;flex-wrap:wrap}
+header b{font-size:15px}input,select,button,textarea{font:inherit;background:#262a31;color:#e8e6e0;border:1px solid #3a3f48;border-radius:6px;padding:6px 8px}
+button{cursor:pointer}button.pri{background:#d9682c;border-color:#d9682c;color:#fff}
+main{flex:1;display:flex;min-height:0}#map{flex:1.4;min-width:0;background:#0e1013;touch-action:none}
+#side{flex:1;min-width:300px;max-width:460px;overflow:auto;padding:10px;border-left:1px solid #2a2e35}
+@media(max-width:800px){main{flex-direction:column}#map{flex:none;height:46vh}#side{max-width:none;border-left:0;border-top:1px solid #2a2e35}}
+h2{font-size:15px;margin:10px 0 6px}table{border-collapse:collapse;width:100%}td{padding:3px 4px;vertical-align:top}td:first-child{color:#9aa0a8;white-space:nowrap}
+.sw{display:inline-block;width:14px;height:14px;border-radius:3px;border:1px solid #555;vertical-align:-2px;margin-right:4px}
+.row{display:flex;gap:6px;flex-wrap:wrap;margin:6px 0}.row>*{flex:1;min-width:110px}label{display:block;font-size:12px;color:#9aa0a8}
+#list div{padding:5px 6px;border-bottom:1px solid #23262c;cursor:pointer}#list div:hover{background:#20242b}#list .on{background:#2b3038}
+a{color:#7fc4ff}.tag{font-size:11px;background:#31502f;border-radius:4px;padding:1px 5px;margin-left:4px}
+@media print{header,#map,#ed,#list,.noprint{display:none!important}body{background:#fff;color:#000;height:auto}#side{max-width:none;overflow:visible}}
+</style></head><body>
+<header><b>Building browser</b><input id="q" placeholder="Search id or landmark" style="flex:1;min-width:120px">
+<select id="fk"><option value="">All kinds</option><option value="1">Commercial</option><option value="5">Apartments</option><option value="2">Public</option><option value="4">Industrial</option><option value="0">Houses</option></select>
+<label style="display:flex;gap:4px;align-items:center;color:#e8e6e0"><input type="checkbox" id="fe">Edited only</label>
+<button id="exp" class="pri">Export changes</button><button id="copy">Copy changes</button><button onclick="print()">Save as PDF</button></header>
+<main><canvas id="map"></canvas><div id="side">
+<div id="info">Tap a building on the map, or pick one from the list.</div>
+<div id="ed" style="display:none"><h2>Fix this building</h2>
+<div class="row"><div><label>Wall</label><select id="e_wall"></select></div><div><label>Wall colour</label><input type="color" id="e_tint"></div></div>
+<div class="row"><div><label>Roof</label><select id="e_roof"></select></div><div><label>Roof colour</label><input type="color" id="e_rtint"></div></div>
+<div class="row"><div><label>Storeys</label><input type="number" id="e_fl" min="1" max="30" step="0.5"></div><div><label>Ground floor</label><select id="e_shop"><option value="">Plain wall</option><option value="shop_brick">Brick storefront</option><option value="shop_buff">Stone storefront</option><option value="shop_modern">Modern storefront</option></select></div></div>
+<div class="row"><div><label>Awning colour (blank for none)</label><input id="e_awn" placeholder="#3a5a3a"></div><div><label>State</label><select id="e_sp"><option value="">Standing</option><option value="construction">Under construction</option></select></div></div>
+<label>Note for the rebuild (what it really looks like, sign text, photo file name)</label><textarea id="e_note" rows="3" style="width:100%"></textarea>
+<div class="row"><button id="save" class="pri">Save change</button><button id="undo">Remove change</button></div></div>
+<h2 class="noprint">Buildings <span id="cnt"></span></h2><div id="list"></div><div id="printout"></div></div></main>
+<script>
+const KIND={0:'House',3:'Shed or garage',1:'Commercial',2:'Public',4:'Industrial',5:'Apartments'};
+const WALLS=['f_brick_red','f_brick_buff','f_brick_dark','f_concrete','f_glass','f_panel','f_stucco','f_metal','f_cmu','f_siding','f_lap','f_garage'],ROOFS=['r_membrane','r_gravel','r_shingle','r_seam','r_parking'];
+const NAME=s=>s.replace(/^[frs]_|^shop_/,'').replace(/_/g,' ');
+// approximate map position: Hewitt and Colby as the anchor, 10 units to a metre, north up
+const LL=(x,y)=>[47.9790-(y-11910)*0.1/111200,-122.2079+(x-15165)*0.1/74520];
+let W,L,OV={},ED=JSON.parse(localStorage.getItem('hh_bedits')||'{}'),sel=null,vx=15500,vy=11900,vs=0.08,B=[];
+const cv=document.getElementById('map'),g=cv.getContext('2d'),$=id=>document.getElementById(id);
+for(const w of WALLS)$('e_wall').add(new Option(NAME(w),w));for(const r of ROOFS)$('e_roof').add(new Option(NAME(r),r));
+Promise.all([fetch('data/world.json').then(r=>r.json()),fetch('data/buildings.json').then(r=>r.json()),fetch('data/overrides.json').then(r=>r.ok?r.json():{}).catch(()=>({}))]).then(([w,l,o])=>{W=w;L=l;OV=o;
+ w.bld.forEach((b,i)=>{const k=L[i];if(!k)return;const xs=[],ys=[];for(let q=3;q<b.length;q+=2){xs.push(b[q]);ys.push(b[q+1]);}let nm='',bd=250;for(const p of w.pois){const d=Math.hypot(p[1]-k[7],p[2]-k[8]);if(d<bd){bd=d;nm=p[0];}}
+  B.push({i,xs,ys,x0:Math.min(...xs),x1:Math.max(...xs),y0:Math.min(...ys),y1:Math.max(...ys),k,nm});});size();list();});
+function cur(b){const e=ED[b.i]||{};return{wall:e.wall||b.k[0],tint:e.tint||b.k[1],roof:e.roof||b.k[2],rtint:e.rtint||b.k[3],fl:e.fl||b.k[4],shop:e.shop!==undefined?e.shop:b.k[5]};}
+function size(){cv.width=cv.clientWidth*devicePixelRatio;cv.height=cv.clientHeight*devicePixelRatio;draw();}
+function draw(){if(!W)return;const s=vs*devicePixelRatio,X=x=>(x-vx)*s+cv.width/2,Y=y=>(y-vy)*s+cv.height/2;g.fillStyle='#0e1013';g.fillRect(0,0,cv.width,cv.height);
+ g.strokeStyle='#2c3038';g.lineCap='round';for(const e of W.edges){const a=W.nodes[e[0]],b=W.nodes[e[1]];g.lineWidth=Math.max(1,e[3]*s);g.beginPath();g.moveTo(X(a[0]),Y(a[1]));g.lineTo(X(b[0]),Y(b[1]));g.stroke();}
+ for(const b of B){if(X(b.x1)<0||X(b.x0)>cv.width||Y(b.y1)<0||Y(b.y0)>cv.height)continue;g.beginPath();b.xs.forEach((x,q)=>q?g.lineTo(X(x),Y(b.ys[q])):g.moveTo(X(x),Y(b.ys[q])));g.closePath();g.fillStyle=cur(b).tint;g.fill();
+  g.lineWidth=b===sel?3*devicePixelRatio:1;g.strokeStyle=b===sel?'#ffd23f':ED[b.i]?'#5fd068':b.k[6]?'#7fc4ff':'#00000066';g.stroke();}
+ if(s>0.5){g.fillStyle='#fff';g.font=11*devicePixelRatio+'px system-ui';g.textAlign='center';for(const b of B)if(b.nm&&X(b.k[7])>0&&X(b.k[7])<cv.width)g.fillText(b.nm,X(b.k[7]),Y(b.k[8]));}}
+function pick(px,py){const s=vs,x=(px-cv.clientWidth/2)/s+vx,y=(py-cv.clientHeight/2)/s+vy;for(const b of B){if(x<b.x0||x>b.x1||y<b.y0||y>b.y1)continue;let c=false;for(let i=0,j=b.xs.length-1;i<b.xs.length;j=i++)if((b.ys[i]>y)!==(b.ys[j]>y)&&x<(b.xs[j]-b.xs[i])*(y-b.ys[i])/(b.ys[j]-b.ys[i])+b.xs[i])c=!c;if(c)return b;}return null;}
+let drag=null,pts=new Map();cv.onpointerdown=e=>{cv.setPointerCapture(e.pointerId);pts.set(e.pointerId,[e.offsetX,e.offsetY]);drag={x:e.offsetX,y:e.offsetY,m:0,d:0};};
+cv.onpointermove=e=>{if(!pts.has(e.pointerId))return;const p=pts.get(e.pointerId);if(pts.size===2){const o=[...pts.entries()].find(q=>q[0]!==e.pointerId)[1],d0=Math.hypot(p[0]-o[0],p[1]-o[1]),d1=Math.hypot(e.offsetX-o[0],e.offsetY-o[1]);if(d0>5)vs=Math.min(3,Math.max(0.02,vs*d1/d0));}else{vx-=(e.offsetX-p[0])/vs;vy-=(e.offsetY-p[1])/vs;}drag.m+=Math.abs(e.offsetX-p[0])+Math.abs(e.offsetY-p[1]);pts.set(e.pointerId,[e.offsetX,e.offsetY]);draw();};
+cv.onpointerup=e=>{pts.delete(e.pointerId);if(drag&&drag.m<8){const b=pick(e.offsetX,e.offsetY);if(b)select(b,false);}};cv.onwheel=e=>{e.preventDefault();vs=Math.min(3,Math.max(0.02,vs*(e.deltaY<0?1.2:0.83)));draw();};addEventListener('resize',size);
+function select(b,centre){sel=b;if(centre){vx=b.k[7];vy=b.k[8];vs=Math.max(vs,0.5);}const c=cur(b),ll=LL(b.k[7],b.k[8]),a=b.xs.reduce((s,x,i)=>{const j=(i+1)%b.xs.length;return s+x*b.ys[j]-b.xs[j]*b.ys[i];},0);
+ $('info').innerHTML=`<h2>#${b.i}${b.nm?' · '+b.nm:''}${ED[b.i]?'<span class="tag">edited here</span>':b.k[6]?'<span class="tag">matched earlier</span>':''}</h2><table>
+ <tr><td>Kind</td><td>${KIND[b.k[9]]||b.k[9]}</td></tr><tr><td>Storeys</td><td>${c.fl}</td></tr><tr><td>Footprint</td><td>${Math.round(Math.abs(a)/200)} m²</td></tr>
+ <tr><td>Wall now</td><td><span class="sw" style="background:${c.tint}"></span>${NAME(c.wall)}${c.shop?' over '+NAME(c.shop)+' storefront':''}</td></tr><tr><td>Roof now</td><td><span class="sw" style="background:${c.rtint}"></span>${NAME(c.roof)}</td></tr>
+ <tr><td>Real place</td><td><a target="_blank" href="https://www.google.com/maps/@?api=1&map_action=pano&viewpoint=${ll[0].toFixed(6)},${ll[1].toFixed(6)}">Street view</a> · <a target="_blank" href="https://www.google.com/maps/search/?api=1&query=${ll[0].toFixed(6)},${ll[1].toFixed(6)}">Map</a> (position approximate)</td></tr></table>`;
+ const e=ED[b.i]||{};$('ed').style.display='';$('e_wall').value=c.wall;$('e_tint').value=c.tint;$('e_roof').value=ROOFS.includes(c.roof)?c.roof:'r_membrane';$('e_rtint').value=c.rtint;$('e_fl').value=c.fl;$('e_shop').value=c.shop||'';$('e_awn').value=e.awn||'';$('e_sp').value=e.special||'';$('e_note').value=e.note||'';draw();list();}
+$('save').onclick=()=>{if(!sel)return;const e={wall:$('e_wall').value,tint:$('e_tint').value,roof:$('e_roof').value,rtint:$('e_rtint').value,fl:+$('e_fl').value,shop:$('e_shop').value||null};if(/^#[0-9a-f]{6}$/i.test($('e_awn').value))e.awn=$('e_awn').value;if($('e_sp').value)e.special=$('e_sp').value;if($('e_note').value.trim())e.note=$('e_note').value.trim();ED[sel.i]=e;localStorage.setItem('hh_bedits',JSON.stringify(ED));select(sel,false);};
+$('undo').onclick=()=>{if(!sel)return;delete ED[sel.i];localStorage.setItem('hh_bedits',JSON.stringify(ED));select(sel,false);};
+const out=()=>JSON.stringify(Object.assign({},OV,ED),null,1);
+$('exp').onclick=()=>{const a=document.createElement('a');a.href=URL.createObjectURL(new Blob([out()],{type:'application/json'}));a.download='overrides.json';a.click();};
+$('copy').onclick=()=>navigator.clipboard.writeText(out()).then(()=>{$('copy').textContent='Copied';setTimeout(()=>$('copy').textContent='Copy changes',1500);});
+function list(){const q=$('q').value.trim().toLowerCase(),fk=$('fk').value,fe=$('fe').checked;let r=B.filter(b=>(!fk||String(b.k[9])===fk)&&(!fe||ED[b.i])&&(!q||String(b.i)===q||b.nm.toLowerCase().includes(q)));
+ r.sort((a,b)=>Math.hypot(a.k[7]-vx,a.k[8]-vy)-Math.hypot(b.k[7]-vx,b.k[8]-vy));$('cnt').textContent='('+r.length+', nearest to the map centre first)';
+ $('list').innerHTML=r.slice(0,150).map(b=>{const c=cur(b);return `<div data-i="${b.i}" class="${b===sel?'on':''}"><span class="sw" style="background:${c.tint}"></span>#${b.i} ${b.nm||KIND[b.k[9]]} · ${c.fl} st · ${NAME(c.wall)}${ED[b.i]?'<span class="tag">edited</span>':''}</div>`;}).join('');
+ $('printout').innerHTML='<h2>Changes</h2>'+Object.keys(ED).map(i=>`<p>#${i}: ${Object.entries(ED[i]).map(([k,v])=>k+' '+v).join(', ')}</p>`).join('');}
+$('list').onclick=e=>{const d=e.target.closest('[data-i]');if(d)select(B.find(b=>b.i===+d.dataset.i),true);};$('q').oninput=$('fk').onchange=$('fe').onchange=list;
+</script></body></html>

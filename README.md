@@ -190,3 +190,7 @@ The film pass switches itself off on devices that cannot hold 25 frames a second
 
 `tools/citygen.py` now builds, for every street in the network: raised sidewalks with kerbs on both sides (narrowed or skipped where a building stands), ladder crosswalks and stop lines on each approach to the 23 signals, and street trees in the planting strip (close together downtown, sparser outside it). Trees are grouped into cells and only the cells near the player are drawn.
 
+## Building browser
+
+`buildings.html` (on the site at `/buildings.html`) lists every building in the game on a map: tap one to see its number, nearest landmark, kind, storeys, footprint size and the wall and roof it currently has, with a link to street view at its approximate real position. A form sets the wall, colours, storeys, storefront, awning and state and takes a note. Changes are kept in the browser; Export or Copy produces `overrides.json`. Put that file in `data/` and run `tools/citygen.py` to rebuild the city with those changes (`data/buildings.json` is the list the browser reads, written by the same tool).
+
