@@ -635,6 +635,92 @@ for site in blocks.SITES:
                 BF.box(PB, mx, Hat(mx, my) + 1, my, math.hypot(bx - ax, by - ay) / m - 3, 11, 1.2, fc, math.atan2(by - ay, bx - ax))
     for nm, x, y, ang, sc in site.get('props', []):
         EXTRA['props'].append([nm, x, y, ang, sc])
+# ---------- every street: raised sidewalks with kerbs, crosswalks at signals, street trees ----------
+_mp = Image.open(REPO + ('/data/map_base.png' if os.path.exists(REPO + '/data/map_base.png') else '/data/map.png')).convert('L')
+_mx = _mp.load()
+
+
+def bsolid(x, y):
+    tx, ty = int(x // 20), int(y // 20)
+    return 0 <= tx < _mp.width and 0 <= ty < _mp.height and _mx[tx, ty] == 120
+
+
+ADJ = {}
+for e in EDGES:
+    a, b = NODES[e[0]], NODES[e[1]]
+    ln = math.hypot(b[0] - a[0], b[1] - a[1])
+    if ln < 1:
+        continue
+    d = ((b[0] - a[0]) / ln, (b[1] - a[1]) / ln)
+    ADJ.setdefault(e[0], []).append((e[3], d))
+    ADJ.setdefault(e[1], []).append((e[3], (-d[0], -d[1])))
+SW, KH = 24.0, 1.6
+walkc, kerbc, paint = lin('#c4c1b8'), tuple(v * 0.55 for v in lin('#a8a59d')), (0.82, 0.82, 0.8)
+SIG = set(W['sig'])
+
+
+def hold(node, d):
+    cross = [ww for ww, dd in ADJ.get(node, []) if abs(dd[0] * d[0] + dd[1] * d[1]) < 0.7]
+    return (max(cross) / 2 + (0 if abs(d[0]) >= abs(d[1]) else SW), max(cross)) if cross else (0, 0)
+
+
+EXTRA['trees'] = []
+nwalk = ncross = 0
+for ei, e in enumerate(EDGES):
+    a, b, w = NODES[e[0]], NODES[e[1]], e[3]
+    ln = math.hypot(b[0] - a[0], b[1] - a[1])
+    if ln < 60:
+        continue
+    dx, dy = (b[0] - a[0]) / ln, (b[1] - a[1]) / ln
+    (ta, wa), (tb, wb) = hold(e[0], (dx, dy)), hold(e[1], (dx, dy))
+    run = ln - ta - tb
+    if run < 40:
+        continue
+    n = max(1, round(run / 170))
+    for side in (1, -1):
+        nx, ny = -dy * side, dx * side
+        for k in range(n):
+            t0, t1 = ta + run * k / n, ta + run * (k + 1) / n
+            sw = SW
+            mxq, myq = a[0] + dx * (t0 + t1) / 2 + nx * (w / 2 + SW), a[1] + dy * (t0 + t1) / 2 + ny * (w / 2 + SW)
+            if bsolid(mxq, myq):
+                sw = 11.0
+                if bsolid(a[0] + dx * (t0 + t1) / 2 + nx * (w / 2 + sw), a[1] + dy * (t0 + t1) / 2 + ny * (w / 2 + sw)):
+                    continue
+            P0 = (a[0] + dx * t0 + nx * w / 2, a[1] + dy * t0 + ny * w / 2)
+            P1 = (a[0] + dx * t1 + nx * w / 2, a[1] + dy * t1 + ny * w / 2)
+            Q0, Q1 = (P0[0] + nx * sw, P0[1] + ny * sw), (P1[0] + nx * sw, P1[1] + ny * sw)
+            h = [Hat(*q) for q in (P0, P1, Q1, Q0)]
+            WBk = BF.get(mxq, myq, 'g_walk')
+            BF.quad(WBk, (P0[0], h[0] + KH, P0[1]), (P1[0], h[1] + KH, P1[1]), (Q1[0], h[2] + KH, Q1[1]), (Q0[0], h[3] + KH, Q0[1]), (0.0, 0.0, (t1 - t0) / 64.0, sw / 64.0), walkc)
+            BF.quad(BF.get(mxq, myq, 'plain'), (P0[0], h[0] - 0.3, P0[1]), (P1[0], h[1] - 0.3, P1[1]), (P1[0], h[1] + KH, P1[1]), (P0[0], h[0] + KH, P0[1]), (0, 0, 1, 1), kerbc)
+            nwalk += 1
+        # street trees in the planting strip: close together downtown, sparser outside it
+        core = CORE((a[0] + b[0]) / 2, (a[1] + b[1]) / 2)
+        if not core and (ei + (side > 0)) % 2:
+            continue
+        gap = 120.0 if core else 330.0
+        rr = random.Random(ei * 31 + side)
+        t = ta + 45 + rr.uniform(0, gap * 0.5)
+        while t < ln - tb - 45:
+            x, y = a[0] + dx * t + nx * (w / 2 + 10), a[1] + dy * t + ny * (w / 2 + 10)
+            if not bsolid(x, y) and not bsolid(x + nx * 16, y + ny * 16):
+                EXTRA['trees'].append([round(x), round(y), round(rr.uniform(0.62, 0.95), 2)])
+            t += gap * rr.uniform(0.85, 1.2)
+    # ladder crosswalks on each approach to a signal
+    for node, (t_, wc), sgn in ((e[0], (ta, wa), 1), (e[1], (tb, wb), -1)):
+        if node not in SIG or not wc:
+            continue
+        o = NODES[node]
+        c0 = wc / 2 + 7
+        for q in range(int(w / 9)):
+            lat = -w / 2 + 4.5 + q * 9
+            c = [(o[0] + sgn * dx * (c0 + u) - dy * (lat + v), o[1] + sgn * dy * (c0 + u) + dx * (lat + v)) for u, v in ((0, -2.2), (17, -2.2), (17, 2.2), (0, 2.2))]
+            BF.quad(BF.get(o[0], o[1], 'plain'), *[(x, Hat(x, y) + 0.45, y) for x, y in c], (0, 0, 1, 1), paint)
+        sl = [(o[0] + sgn * dx * (c0 + u) - dy * v, o[1] + sgn * dy * (c0 + u) + dx * v) for u, v in ((22, -w / 2 + 2), (25, -w / 2 + 2), (25, w / 2 - 2), (22, w / 2 - 2))]
+        BF.quad(BF.get(o[0], o[1], 'plain'), *[(x, Hat(x, y) + 0.45, y) for x, y in sl], (0, 0, 1, 1), paint)
+        ncross += 1
+print('sidewalk segments', nwalk, 'crosswalks', ncross, 'street trees', len(EXTRA['trees']))
 json.dump(EXTRA, open(REPO + '/data/extras.json', 'w'), separators=(',', ':'))
 # collision map: clear the tiles of removed footprints, mark the tiles of added buildings (1 tile = 20 units)
 if not os.path.exists(REPO + '/data/map_base.png'):

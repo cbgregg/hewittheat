@@ -186,3 +186,7 @@ The film pass switches itself off on devices that cannot hold 25 frames a second
 - **Cutscenes:** fades only at the start, the end and location changes; shots push in slowly; a tap skips a line and a double tap skips the scene.
 - **Sound and music:** `data/amb.json`, generated with ElevenLabs by `tools/audio_gen.py`: rain, city and bar ambience, engine loop, thunder, a jail door, a stinger, and three music tracks (menu, cutscene underscore, night ride).
 
+## Streets, sidewalks and trees
+
+`tools/citygen.py` now builds, for every street in the network: raised sidewalks with kerbs on both sides (narrowed or skipped where a building stands), ladder crosswalks and stop lines on each approach to the 23 signals, and street trees in the planting strip (close together downtown, sparser outside it). Trees are grouped into cells and only the cells near the player are drawn.
+

@@ -2,7 +2,7 @@ import * as THREE from 'three';
 import {GLTFLoader} from 'three/addons/loaders/GLTFLoader.js';
 import {clone as skClone} from 'three/addons/utils/SkeletonUtils.js';
 /* Downtown Everett built from City of Everett GIS data: street centerlines, building footprints, 2 ft contours, parks, bus stops, 2022 aerial imagery. 10 units = 1 m, one tile = 2 m. */
-const PI=Math.PI,T=20,DV='?v=1125g';
+const PI=Math.PI,T=20,DV='?v=1125h';
 let MW=0,MH=0,WW=0,WH=0,map=new Uint8Array(1),HMAP=null,gw=0,gh=0,GS=80,WORLD=null;
 const WATER=0,GRASS=1,ROAD=2,WALK=3,BLDG=4,PARK=5,CONC=6,HOUSE=7;
 const SOL=[1,0,0,0,1,0,0,0];
@@ -588,7 +588,7 @@ function airMat(tex,U){const m=new THREE.MeshStandardMaterial({map:tex,roughness
    diffuseColor.rgb=c;}`);};
  return m;}
 function inst(geo,mat,mats,cast){const im=new THREE.InstancedMesh(geo,mat,mats.length);mats.forEach((m,k)=>im.setMatrixAt(k,m));im.castShadow=!!cast;im.receiveShadow=true;im.frustumCulled=false;scene.add(im);return im;}
-function instGLB(g,mats,cast,ry,col){if(!g||!mats.length)return;g.updateMatrixWorld(true);const R=new THREE.Matrix4().makeRotationY(ry||0);g.traverse(o=>{if(!o.isMesh)return;const ge=o.geometry.clone();ge.applyMatrix4(o.matrixWorld);ge.applyMatrix4(R);const m=o.material;m.metalness=0;m.roughness=0.8;if(m.emissive){m.emissive.set(0);m.emissiveMap=null;}if(col)m.color.set(col);if(m.map)m.map.anisotropy=4;if(m.transparent){m.transparent=false;m.alphaTest=0.5;m.depthWrite=true;}inst(ge,m,mats,cast);});}
+function instGLB(g,mats,cast,ry,col,out){if(!g||!mats.length)return;g.updateMatrixWorld(true);const R=new THREE.Matrix4().makeRotationY(ry||0);g.traverse(o=>{if(!o.isMesh)return;const ge=o.geometry.clone();ge.applyMatrix4(o.matrixWorld);ge.applyMatrix4(R);const m=o.material;m.metalness=0;m.roughness=0.8;if(m.emissive){m.emissive.set(0);m.emissiveMap=null;}if(col)m.color.set(col);if(m.map)m.map.anisotropy=4;if(m.transparent){m.transparent=false;m.alphaTest=0.5;m.depthWrite=true;}const im=inst(ge,m,mats,cast);if(out)out.push(im);});}
 function buildStatic(){
  const n0=scene.children.length;buildStatic2();for(let i=n0;i<scene.children.length;i++)if(!scene.children[i].isSprite)STATIC.push(scene.children[i]);}
 function buildStatic2(){
@@ -659,8 +659,9 @@ function buildStatic2(){
  const tm=[];for(let y=3;y<MH;y+=6)for(let x=3;x<MW;x+=6){const t=map[I(x,y)],p=h2(x,y);if(!((t===PARK&&p<0.42)||(t===GRASS&&p<0.035)))continue;if(tile(x+3,y)===BLDG||tile(x-3,y)===BLDG||tile(x,y+3)===BLDG||tile(x,y-3)===BLDG||tile(x+3,y)===ROAD||tile(x-3,y)===ROAD)continue;
   const wx=(x+h2(x,y+1)*4-2)*T,wy=(y+h2(x+1,y)*4-2)*T,s=0.75+h2(y,x)*0.8;if((EXTRA.clear||[]).some(b=>wx>b[0]-40&&wx<b[2]+40&&wy>b[1]-40&&wy<b[3]+40))continue;Q.setFromAxisAngle(UP,p*40);tm.push(M4().compose(new THREE.Vector3(wx,Hat(wx,wy),wy),Q,new THREE.Vector3(s,s*(0.9+p),s)));}
  // street trees and site machines placed block by block (data/extras.json, from tools/blocks.py)
- const st=[];for(const t of EXTRA.trees||[]){Q.setFromAxisAngle(UP,(t[0]*0.37+t[1]*0.11)%6.28);st.push(M4().compose(new THREE.Vector3(t[0],Hat(t[0],t[1]),t[1]),Q,new THREE.Vector3(t[2],t[2],t[2])));}
- if(tm.length||st.length){if(PROPS.tree&&PROPS.pine){const ta=st.slice(),tp=[];tm.forEach((m,i)=>((i*7)%10<6?ta:tp).push(m));instGLB(PROPS.tree,ta,true);instGLB(PROPS.pine,tp,true);}else inst(geoOf(tb),S({}),tm.concat(st),true);}
+ if(tm.length){if(PROPS.tree&&PROPS.pine){const ta=[],tp=[];tm.forEach((m,i)=>((i*7)%10<6?ta:tp).push(m));instGLB(PROPS.tree,ta,true);instGLB(PROPS.pine,tp,true);}else inst(geoOf(tb),S({}),tm,true);}
+ {const TC=new Map();for(const t of EXTRA.trees||[]){Q.setFromAxisAngle(UP,(t[0]*0.37+t[1]*0.11)%6.28);const k=Math.floor(t[0]/1600)+','+Math.floor(t[1]/1600);let c=TC.get(k);if(!c){c={m:[],x:0,y:0,o:[]};TC.set(k,c);}c.m.push(M4().compose(new THREE.Vector3(t[0],Hat(t[0],t[1]),t[1]),Q,new THREE.Vector3(t[2],t[2],t[2])));c.x+=t[0];c.y+=t[1];}
+  TC.forEach(c=>{c.x/=c.m.length;c.y/=c.m.length;if(PROPS.tree)instGLB(PROPS.tree,c.m,true,0,null,c.o);else c.o.push(inst(geoOf(tb),S({}),c.m,true));TCELLS.push(c);});}
  {const by={};for(const p of EXTRA.props||[]){Q.setFromAxisAngle(UP,-p[3]);(by[p[0]]=by[p[0]]||[]).push(M4().compose(new THREE.Vector3(p[1],Hat(p[1],p[2]),p[2]),Q,new THREE.Vector3(p[4],p[4],p[4])));}for(const k in by)if(PROPS[k])instGLB(PROPS[k],by[k],true);}
  // street lamps, signals, bus stops along the real street network
  const lb=B_(),pc=[0.2,0.22,0.23];cube(lb,0,37,0,1.8,74,1.8,pc);cube(lb,11,73,0,22,1.6,1.6,pc);cube(lb,21,72,0,8,2,4,[0.9,0.88,0.8]);
@@ -800,7 +801,7 @@ function init3D(){
 function initMarkers(){GV.forEach((gv,i)=>MK['g'+i]=mkMarker(gv.type==='race'?'#ff5ad0':'#ffd23f',gv.type==='courier'?'COURIER':gv.type==='race'?'RACE':'EXPORT'));PKG.forEach(p=>{p.m=box(9,9,9,0,0,0,0,null,bmat('#40e0ff'));p.m.castShadow=false;scene.add(p.m);});
  MK.shop=mkMarker('#ff8a30','BODY SHOP');MK.pawn=mkMarker('#7ad06a','AMMO');MK.hosp=mkMarker('#ff5a6a','HEAL');MK.tgt=mkMarker('#ffe45a','▼');MK.story=mkMarker('#40e0ff','STORY');}
 /* --- optional: Google Photorealistic 3D Tiles. Needs the player's own Map Tiles API key and a normal web host (blocked inside the Claude artifact). --- */
-const BUILD='Nov 25 9:55pm - Release night';
+const BUILD='Nov 25 10:20pm - Streets';
 /* ---------- film pass: HDR scene -> sharpen, glow, tone map, grade, grain ---------- */
 let FX=null;const GTKU={value:1};
 function initFX(){try{const sz=ren.getDrawingBufferSize(new THREE.Vector2()),rt=new THREE.WebGLRenderTarget(sz.x,sz.y,{samples:LOW?0:4,type:THREE.HalfFloatType});rt.depthTexture=new THREE.DepthTexture(sz.x,sz.y);
@@ -887,7 +888,7 @@ const SUNV=new THREE.Vector3(-0.45,0.78,0.42).normalize();
    crosses the southern sky and sets in the west at 20:00; the moon takes over as a dim blue light. ---------- */
 let TOFF=(()=>{const h=parseFloat(new URLSearchParams(location.search).get('hour'));return isFinite(h)?(h*60-540+1440)%1440:0;})();
 const gmin=()=>(540+time+TOFF)%1440,NIGHT={value:0},DN={k:1,inset:false,lit:[],pool:[],pt:0,sunC:new THREE.Color(),c0:new THREE.Color(0xff8a4a),c1:new THREE.Color(0xfff1d6),cm:new THREE.Color(0x8fa8ff),f0:new THREE.Color(0xc3d0dc),f1:new THREE.Color(0x0a1220),f2:new THREE.Color(0xe9b48a)};
-let RAIN=null,RAINON=false,RAINS=null;const RAINU={value:0};
+const TCELLS=[];let RAIN=null,RAINON=false,RAINS=null;const RAINU={value:0};
 function rainTick(dt){const tg=RAINON&&!DN.inset?1:0;RAINU.value+=(tg-RAINU.value)*Math.min(1,dt*0.9);
  if(!RAIN){const n=LOW?800:1900,p=new Float32Array(n*6),bb=new Float32Array(n*2);for(let i=0;i<n;i++){const x=(Math.random()-0.5)*760,z=(Math.random()-0.5)*760,y=Math.random()*400;p.set([x,0,z,x+1.6,-14,z+0.9],i*6);bb[i*2]=bb[i*2+1]=y;}
   const ge=new THREE.BufferGeometry();ge.setAttribute('position',new THREE.BufferAttribute(p,3));ge.setAttribute('b',new THREE.BufferAttribute(bb,1));
@@ -939,7 +940,8 @@ if(scene.fog){const gold=isDay?(1-ss(0.1,0.45,up))*(1-night):0;scene.fog.color.c
  if(DN.glow){DN.glow.visible=night>0.05;DN.glowM.color.setRGB(3.2*night*boost,2.5*night*boost,1.5*night*boost);}
  if(DN.pool.length&&time-DN.pt>0.4){DN.pt=time;const cx=P.x,cy=P.y;const near=DN.lit.map(l=>[(l.x-cx)**2+(l.z-cy)**2,l]).sort((a,b)=>a[0]-b[0]);
   DN.pool.forEach((pl,i)=>{const l=near[i]&&near[i][0]<1500*1500?near[i][1]:null;pl.visible=!!l&&night>0.05&&!DN.inset;if(l)pl.position.copy(l);});}
- for(const pl of DN.pool)pl.intensity=7000*night;}
+ for(const pl of DN.pool)pl.intensity=7000*night;
+ if(time-(DN.tt||-9)>0.4){DN.tt=time;const R=LOW?2600:4400;for(const c of TCELLS){const v=!DN.inset&&!(GT&&gReady)&&Math.abs(c.x-P.x)+Math.abs(c.y-P.y)<R;for(const o of c.o)o.visible=v;}}}
 function render(){
  frameId++;const dt=clamp(time-lastT,0,0.05);lastT=time;gDt=dt||0.016;rayBudget=LOW?4:7;
  const SC=[0xff2a20,0xffc020,0x20ff50];MAT.tlNS.color.setHex(SC[sigState(true)]);MAT.tlEW.color.setHex(SC[sigState(false)]);
