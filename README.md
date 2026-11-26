@@ -177,3 +177,12 @@ Building walls are also shaded darker toward the ground so they sit on the stree
 
 The film pass switches itself off on devices that cannot hold 25 frames a second, which also removes ambient occlusion and glow.
 
+## Opening, checkpoints and sound
+
+- **Opening:** a new story starts at night in the rain outside the county lockup. Danny's bike is at the kerb; a few blocks west two men under a street light flag him down (a focus shot plays when he comes into range, then the street exchange when he pulls up), and the bar scene follows. `pre` in a chapter holds the street exchange.
+- **Motorcycle:** `models/v_moto.b64.txt` (Meshy-generated). The rider is posed on it bone by bone; the same method raises an arm to wave.
+- **Rain:** streaks around the camera, wet ground everywhere, thunder with a lightning flash.
+- **Checkpoints:** each mission step is saved in the browser (`everett_cp`). Reloading, or failing and returning to the contact, resumes at that step; steps that need a vehicle resume at the point of taking it.
+- **Cutscenes:** fades only at the start, the end and location changes; shots push in slowly; a tap skips a line and a double tap skips the scene.
+- **Sound and music:** `data/amb.json`, generated with ElevenLabs by `tools/audio_gen.py`: rain, city and bar ambience, engine loop, thunder, a jail door, a stinger, and three music tracks (menu, cutscene underscore, night ride).
+

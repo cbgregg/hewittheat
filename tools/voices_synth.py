@@ -5,7 +5,7 @@ lines={};DIR={}   # key -> (pack, who, text); DIR: key -> acted version of the l
 for i,l in enumerate(s['prologue']): lines['v_pro_%d'%i]=('c0',l['w'],l['t']);DIR['v_pro_%d'%i]=l.get('d')
 for i,l in enumerate(s['epilogue']): lines['v_epi_%d'%i]=(None,l['w'],l['t'])
 for c in s['chapters']:
-    for part in ('intro','outro','post'):
+    for part in ('pre','intro','outro','post'):
         for i,l in enumerate(c.get(part,[])): lines['v_%s_%s_%d'%(c['id'],part,i)]=(c['id'],l['w'],l['t']);DIR['v_%s_%s_%d'%(c['id'],part,i)]=l.get('d')
     for si,st in enumerate(c['steps']):
         for tag,f in (('r','radio'),('l','lines'),('d','done')):
