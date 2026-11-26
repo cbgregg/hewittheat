@@ -47,7 +47,7 @@ B = {
     4539: dict(wall='f_glass', tint='#4a5058', roof='r_membrane', rtint='#c9c9c6', shop=None),
     # ---- Hewitt and Oakes, north-west: long brick building with the pale blue metal roof
     # ---- the arena's pale blue roof
-    5768: dict(rtint='#a9c4dc'),
+    5768: dict(rtint='#a9c4dc', hft=71),  # curved roof: LiDAR 95th percentile, not the mean
 }
 
 # footprints the recording shows as open ground (removed from the model and from the collision map)

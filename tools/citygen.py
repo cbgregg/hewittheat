@@ -221,7 +221,7 @@ ovr(5768, wall='f_metal', tint=lin('#9aa4ad'), shop='shop_modern', roof='r_seam'
 ovr(5805, wall='f_garage', tint=WHITE, shop=None, roof='r_parking', rtint=WHITE, names=['County parking garage'])
 named('Everett Station', wall='f_brick_red', tint=(0.82, 0.78, 0.78), shop=None, roof='r_seam', rtint=lin('#4f8a6f'), pitched=True)
 named('Snohomish County Courthouse', wall='f_concrete', tint=(0.9, 0.9, 0.9), shop=None, roof='r_gravel', rtint=WHITE)
-i = nearest('Snohomish County Courthouse', maxd=1500, tallest=True)
+i = 4599  # 3000 Rockefeller Ave, 94 ft by LiDAR: the tallest building on the county campus
 if i is not None and i not in OVR:
     ovr(i, wall='f_glass', tint=lin('#3a4048'), shop=None, roof='r_membrane', rtint=(0.9, 0.9, 0.9), names=['County administration tower'])  # near-black glass in the flyover
 named('City Hall', wall='f_brick_buff', tint=WHITE, shop=None, roof='r_gravel', rtint=WHITE)
@@ -318,9 +318,11 @@ for br in getattr(blocks, 'BRIDGES', []):
         INFO[i] = (sum(p_[0] for p_ in P) / len(P), sum(p_[1] for p_ in P) / len(P), abs(area2([p_[0] for p_ in P], [p_[1] for p_ in P])) / 2)
 for i, d in blocks.B.items():
     ovr(i, **blk(d))
+HAND = set()
 if os.path.exists(REPO + '/data/overrides.json'):
     for k_, d_ in json.load(open(REPO + '/data/overrides.json')).items():
         ovr(int(k_), **blk(d_))
+        HAND.add(int(k_))
 GONE = set(blocks.GONE)
 ADDED = []
 for d in blocks.ADD:
@@ -333,6 +335,20 @@ for d in blocks.ADD:
     ADDED.append(P)
 
 CORE = lambda x, y: 12500 < x < 20500 and 9500 < y < 15500
+
+# whole-map measurements (tools/dossier_all.py). Footprints that were split, removed or added by hand are left alone.
+AUTO = {}
+if os.path.exists(REPO + '/data/dossier/auto.json'):
+    AUTO = {int(k): v for k, v in json.load(open(REPO + '/data/dossier/auto.json')).items() if int(k) not in blocks.SPLIT and int(k) not in GONE and v}
+
+
+def _texmean(name):
+    im = Image.open(REPO + '/tex/b/%s.jpg' % name).convert('RGB').resize((32, 32))
+    px = [im.getpixel((x, y)) for x in range(32) for y in range(32)]
+    return tuple(max(0.03, sum(lin('#%02x%02x%02x' % p)[q] for p in px) / len(px)) for q in range(3))
+
+
+TEXM = {k: _texmean(k) for k in ('r_membrane', 'r_gravel', 'r_shingle', 'r_seam')}
 
 
 def look(i):
@@ -376,8 +392,29 @@ def look(i):
         rf = pick(r, [('r_membrane', 62), ('r_gravel', 38)] if not core or h > 120 else [('r_membrane', 45), ('r_gravel', 55)])
         rt = r.choice([(0.86, 0.86, 0.86), (0.82, 0.83, 0.84), (0.66, 0.67, 0.68), (0.8, 0.77, 0.7)]) if rf == 'r_membrane' else r.choice([(1, 1, 1), (0.7, 0.7, 0.7), (0.55, 0.55, 0.56)])
         L.update(wall=w, tint=t, shop=shop, roof=rf, rtint=rt)
+    au = AUTO.get(i)
+    ar = None
+    if au:
+        # measured from public records by tools/dossier_all.py; hand-set looks below still win
+        if au.get('lead') is not None:
+            Lb = look(au['lead'])
+            L.update({k: Lb[k] for k in ('wall', 'tint', 'shop', 'awn', 'stripe', 'pitched', 'units') if k in Lb})
+        if 'hft' in au:
+            L['hft'] = min(au['hft'], 38) if kind == 0 else min(au['hft'], 16) if kind == 3 else au['hft']
+        if 'rc' in au and L['special'] is None and not L['pitched']:   # pitched roofs read unreliably from above (lit and shaded faces, trees)
+            c = [int(au['rc'][q:q + 2], 16) for q in (1, 3, 5)]
+            lum = 0.3 * c[0] + 0.59 * c[1] + 0.11 * c[2]
+            c = [int(v * 0.5 + lum * 0.5) for v in c]   # the aerial has a green cast; keep the brightness, halve the colour
+            rf = (L['roof'] if L['roof'] in TEXM else 'r_shingle') if L['pitched'] else ('r_seam' if lum < 150 else 'r_membrane') if kind == 4 else ('r_membrane' if lum > 150 else 'r_gravel')
+            ar = dict(roof=rf, rtint=tuple(min(1.0, lin('#%02x%02x%02x' % tuple(c))[q] / TEXM[rf][q]) for q in range(3)))
+            L.update(ar)
+        for k in ('shopon', 'blank'):
+            if k in au:
+                L[k] = au[k]
     if i in OVR:
         L.update({k: v for k, v in OVR[i].items() if k != 'names'})
+        if ar and i not in blocks.B and i not in HAND and not L['pitched'] and L['roof'] in TEXM:
+            L.update(ar)      # landmark looks set by name guessed the roof; the aerial colour is better
     return L
 
 

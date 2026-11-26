@@ -218,3 +218,16 @@ Not available from here: the assessor's per-structure page (year built, storeys,
 Hewitt Ave from Colby to Oakes is the first stretch set this way (48 footprints, 23 buildings). `tools/citygen.py` gained `hft` (measured height), `shopon` (which sides get a storefront), `blank` (windowless party and alley walls) and `pent` (rooftop penthouse).
 
 `tools/shot.py OUT.png "p=x,h,y&t=x,h,y"` takes stills of `data/city.glb` through `tools/preview.html` in headless Chrome, for before and after checks.
+
+### Whole map
+
+`tools/dossier_all.py` runs the same joins for all 6,399 footprints and reads each roof colour from the county 2024 aerial at 1 ft per pixel. It writes `data/dossier/all.json` (address, parcel, use code, LiDAR height and register name per footprint) and `data/dossier/auto.json`, which `tools/citygen.py` applies underneath the hand-set looks in `tools/blocks.py`:
+
+| Applied automatically | Coverage |
+|---|---|
+| Roof height from LiDAR | 5,792 footprints (the rest have no roofprint, mostly sheds, and keep their old height) |
+| Flat roof material and colour from the aerial | Commercial, apartment and industrial buildings; house roofs keep their generated shingle colours |
+| One look for touching footprints on one parcel at the same height | 116 buildings made of 299 footprints |
+| Storefronts only on sides that face a street, blank walls where a neighbour touches | 1,425 non-house buildings |
+
+Wall materials are still generated from the building kind except where `tools/blocks.py` sets them. LiDAR also corrected which footprint is the county administration tower (3000 Rockefeller Ave, 94 ft).
