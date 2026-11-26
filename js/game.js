@@ -549,7 +549,8 @@ function geoOf(b){const ge=new THREE.BufferGeometry();ge.setAttribute('position'
 function ltex(path,srgb){const t=new THREE.TextureLoader().load(path);t.wrapS=t.wrapT=THREE.RepeatWrapping;if(srgb)t.colorSpace=THREE.SRGBColorSpace;t.anisotropy=LOW?4:8;return t;}
 function airMat(tex,U){const m=new THREE.MeshStandardMaterial({map:tex,roughness:0.93,metalness:0});
  m.onBeforeCompile=sh=>{Object.assign(sh.uniforms,U);sh.vertexShader=sh.vertexShader.replace('#include <common>','#include <common>\nvarying vec2 vGP;').replace('#include <begin_vertex>','#include <begin_vertex>\nvGP=position.xz;');
-  sh.fragmentShader=sh.fragmentShader.replace('#include <common>','#include <common>\nuniform sampler2D maskMap;uniform sampler2D aspMap;uniform sampler2D conMap;uniform sampler2D grsMap;uniform vec2 uWS;uniform float uNoAir;varying vec2 vGP;').replace('#include <map_fragment>',`#include <map_fragment>
+  sh.fragmentShader=sh.fragmentShader.replace('#include <common>','#include <common>\nuniform sampler2D maskMap;uniform sampler2D aspMap;uniform sampler2D conMap;uniform sampler2D grsMap;uniform vec2 uWS;uniform float uNoAir;varying vec2 vGP;float gH=0.0,gWet=0.0;').replace('#include <roughnessmap_fragment>','#include <roughnessmap_fragment>\nroughnessFactor=mix(roughnessFactor,0.16,gWet);').replace('#include <normal_fragment_maps>',`#include <normal_fragment_maps>
+{float fd=smoothstep(700.,120.,length(vViewPosition));float dHx=dFdx(gH)*fd,dHy=dFdy(gH)*fd;vec3 sX=dFdx(-vViewPosition),sY=dFdy(-vViewPosition),R1=cross(sY,normal),R2=cross(normal,sX);float fDet=dot(sX,R1);normal=normalize(abs(fDet)*normal-sign(fDet)*(dHx*R1+dHy*R2)*(1.-gWet*0.85));}`).replace('#include <map_fragment>',`#include <map_fragment>
   {vec3 aer=mix(diffuseColor.rgb,vec3(0.17),uNoAir);float al=dot(aer,vec3(0.333));vec3 mk=texture2D(maskMap,vec2(vGP.x/uWS.x,1.0-vGP.y/uWS.y)).rgb;
    float road=smoothstep(0.42,0.58,mk.r),walk=smoothstep(0.7,0.86,mk.g)*(1.0-road),urb=smoothstep(0.25,0.42,mk.g);
    vec3 asp=texture2D(aspMap,vGP*0.0125).rgb,con=texture2D(conMap,vGP*0.02).rgb,grs=texture2D(grsMap,vGP*0.012).rgb;
@@ -562,6 +563,8 @@ function airMat(tex,U){const m=new THREE.MeshStandardMaterial({map:tex,roughness
    c=mix(c,vec3(0.72,0.52,0.08),smoothstep(0.5,0.72,mk.b)*road);
    {float lot=smoothstep(0.5,0.72,mk.b)*(1.0-road)*(1.0-walk);vec2 pq=vGP/vec2(26.0,170.0);float pv=fract(pq.y),stall=step(pv,0.31)+step(0.69,pv),fw=fwidth(pq.x)+1e-5,ln=stall*smoothstep(0.47-fw,0.47+fw,abs(fract(pq.x)-0.5))*clamp(0.05/fw,0.0,1.0);
     c=mix(c,vec3(dot(asp,vec3(0.333)))*vec3(1.08,1.12,1.2)*mix(1.0,far*5.0,0.3),lot*0.9);c=mix(c,vec3(0.74),lot*ln*0.8);}
+   gH=dot(mix(mix(con,grs,veg),asp,road),vec3(0.333))*mix(2.2,1.2,road);
+   {float pd=smoothstep(0.50,0.62,dot(texture2D(aspMap,vGP*0.0031+0.37).rgb,vec3(0.333))*0.6+far*0.6);gWet=road*pd*0.92+walk*pd*0.35;c*=1.-gWet*0.45;}
    diffuseColor.rgb=c;}`);};
  return m;}
 function inst(geo,mat,mats,cast){const im=new THREE.InstancedMesh(geo,mat,mats.length);mats.forEach((m,k)=>im.setMatrixAt(k,m));im.castShadow=!!cast;im.receiveShadow=true;im.frustumCulled=false;scene.add(im);return im;}
@@ -611,7 +614,25 @@ function buildStatic2(){
  const it=new THREE.CanvasTexture(ic);it.wrapS=it.wrapT=THREE.RepeatWrapping;it.colorSpace=THREE.SRGBColorSpace;it.anisotropy=4;MAT.house=S({map:ht});MAT.ind=S({map:it});MAT.shop=S({map:ltex('data/shop.jpg',1)});for(let i=0;i<5;i++)MAT['f'+i]=S({map:ltex('data/f'+i+'.jpg',1)});for(let i=0;i<6;i++)MAT['roof'+i]=roofM[i];
  cells.forEach(b=>{if(!b.p.length)return;const m=new THREE.Mesh(geoOf(b),MAT[b.k]);m.castShadow=true;m.receiveShadow=true;scene.add(m);});
  if(CITY){CITY.traverse(o=>{if(o.isMesh){o.castShadow=true;o.receiveShadow=true;const m=o.material;m.metalness=0;m.roughness=0.86;if(m.map)m.map.anisotropy=LOW?4:8;
-   if(/^(f_|shop_)/.test(m.name)&&!/metal|cmu|lap/.test(m.name)&&!m.userData.gl){m.userData.gl=1;m.onBeforeCompile=sh=>{sh.uniforms.uNight=NIGHT;sh.fragmentShader=sh.fragmentShader.replace('#include <common>','#include <common>\nfloat glassK=0.0;uniform float uNight;').replace('#include <map_fragment>','#include <map_fragment>\n{vec3 tc=texture2D(map,vMapUv).rgb;glassK=smoothstep(0.03,0.14,tc.b-tc.r)*smoothstep(0.75,0.45,tc.r);}').replace('#include <roughnessmap_fragment>','#include <roughnessmap_fragment>\nroughnessFactor=mix(roughnessFactor,0.08,glassK);').replace('#include <emissivemap_fragment>','#include <emissivemap_fragment>\n{vec2 wc=floor(vMapUv*2.0);float on=step(0.58,fract(sin(dot(wc,vec2(12.9898,78.233)))*43758.5453));totalEmissiveRadiance+=vec3(1.0,0.74,0.42)*glassK*on*uNight*2.4;}');};}}});scene.add(CITY);}
+   if(m.map&&!m.userData.nm){m.userData.nm=1;const nt=new THREE.TextureLoader().load('tex/b/'+m.name+'_n.jpg');nt.flipY=false;nt.wrapS=nt.wrapT=THREE.RepeatWrapping;nt.repeat.copy(m.map.repeat);nt.offset.copy(m.map.offset);nt.rotation=m.map.rotation;nt.center.copy(m.map.center);nt.anisotropy=LOW?2:4;m.normalMap=nt;m.normalScale=new THREE.Vector2(0.9,0.9);}
+   if(/^(f_|shop_)/.test(m.name)&&!/metal|cmu|lap/.test(m.name)&&!m.userData.gl){m.userData.gl=1;m.onBeforeCompile=sh=>{sh.uniforms.uNight=NIGHT;sh.fragmentShader=sh.fragmentShader.replace('#include <common>','#include <common>\nfloat glassK=0.0;uniform float uNight;')
+     .replace('#include <map_fragment>','#include <map_fragment>\n{vec3 tc=texture2D(map,vMapUv).rgb;glassK=smoothstep(0.03,0.14,tc.b-tc.r)*smoothstep(0.75,0.45,tc.r);}')
+     .replace('#include <roughnessmap_fragment>','#include <roughnessmap_fragment>\nroughnessFactor=mix(roughnessFactor,0.06,glassK);')
+     .replace('#include <emissivemap_fragment>',`#include <emissivemap_fragment>
+     #ifdef USE_NORMALMAP_TANGENTSPACE
+     if(glassK>0.02){ // a room behind every window: walk the view ray into a box one bay wide and one storey tall
+      vec3 V=normalize(vViewPosition),vT=vec3(dot(V,tbn[0]),dot(V,tbn[1]),dot(V,tbn[2]));vec2 cell=floor(vMapUv*2.0),o=fract(vMapUv*2.0);
+      vec3 r=vec3(-vT.x,-vT.y,max(abs(vT.z),0.06));float D=0.85;
+      float tx=r.x>0.?(1.-o.x)/r.x:-o.x/min(r.x,-1e-4),ty=r.y>0.?(1.-o.y)/r.y:-o.y/min(r.y,-1e-4),tz=D/r.z,tt=min(tx,min(ty,tz));vec3 hp=vec3(o,0.)+r*tt;
+      float hr=fract(sin(dot(cell,vec2(12.9898,78.233)))*43758.5453),hr2=fract(hr*57.31);
+      vec3 wall=mix(vec3(0.62,0.55,0.46),vec3(0.50,0.56,0.62),hr2),rc;
+      if(tt==tz){rc=wall*(0.85+0.15*step(0.38,hp.y));rc=mix(rc,wall*0.45,step(hp.y,0.34)*step(0.2,hp.x)*step(hp.x,0.2+0.5*hr2));}
+      else if(tt==ty)rc=r.y>0.?vec3(0.78):wall*0.5;else rc=wall*0.72;
+      rc*=1.-0.45*hp.z/D;float lit=step(0.58,hr)*uNight;
+      diffuseColor.rgb=mix(diffuseColor.rgb,rc*mix(0.22,0.05,uNight),glassK);
+      totalEmissiveRadiance+=rc*vec3(1.0,0.80,0.52)*glassK*lit*2.6;
+      normal=normalize(mix(normal,nonPerturbedNormal,glassK));}
+     #endif`);};}}});scene.add(CITY);}
  // trees (parks, plus a thin scatter on open grass)
  const M4=()=>new THREE.Matrix4(),Q=new THREE.Quaternion(),UP=new THREE.Vector3(0,1,0),tb=B_(),gc=hex('#2f5a34'),tc=hex('#4a3526');
  cube(tb,0,12,0,4,24,4,tc);for(let k=0;k<3;k++){const y0=18+k*24,ss=26*(1-k*0.27),tp=[0,k===2?110:y0+46,0],c4=[[-ss,y0,-ss],[-ss,y0,ss],[ss,y0,ss],[ss,y0,-ss]];for(let q=0;q<4;q++)tri(tb,c4[q],c4[(q+1)%4],tp,mul(gc,(q%2?1:0.82)*(1-k*0.05)));}
@@ -759,21 +780,31 @@ function initMarkers(){GV.forEach((gv,i)=>MK['g'+i]=mkMarker(gv.type==='race'?'#
 const BUILD='Nov 24 9:50pm';
 /* ---------- film pass: HDR scene -> sharpen, glow, tone map, grade, grain ---------- */
 let FX=null;const GTKU={value:1};
-function initFX(){try{const sz=ren.getDrawingBufferSize(new THREE.Vector2()),rt=new THREE.WebGLRenderTarget(sz.x,sz.y,{samples:LOW?0:4,type:THREE.HalfFloatType});
- const mat=new THREE.ShaderMaterial({depthTest:false,depthWrite:false,uniforms:{t:{value:rt.texture},px:{value:new THREE.Vector2(1/sz.x,1/sz.y)},time:{value:0},ex:{value:0.86},sat:{value:1}},
+function initFX(){try{const sz=ren.getDrawingBufferSize(new THREE.Vector2()),rt=new THREE.WebGLRenderTarget(sz.x,sz.y,{samples:LOW?0:4,type:THREE.HalfFloatType});rt.depthTexture=new THREE.DepthTexture(sz.x,sz.y);
+ const mat=new THREE.ShaderMaterial({depthTest:false,depthWrite:false,uniforms:{t:{value:rt.texture},px:{value:new THREE.Vector2(1/sz.x,1/sz.y)},time:{value:0},ex:{value:0.86},sat:{value:1},dt:{value:rt.depthTexture},nf:{value:new THREE.Vector2(3,7400)},pr:{value:new THREE.Vector2(1,1)},aoK:{value:new URLSearchParams(location.search).has('aodbg')?2.0:LOW?0.0:1.0}},
   vertexShader:'varying vec2 v;void main(){v=uv;gl_Position=vec4(position.xy,0.,1.);}',
-  fragmentShader:`precision highp float;uniform sampler2D t;uniform vec2 px;uniform float time,ex,sat;varying vec2 v;
+  fragmentShader:`precision highp float;uniform sampler2D t,dt;uniform vec2 px,nf,pr;uniform float time,ex,sat,aoK;varying vec2 v;
+  float lz(vec2 u){float z=texture2D(dt,u).x*2.-1.;return 2.*nf.x*nf.y/(nf.y+nf.x-z*(nf.y-nf.x));}
+  vec3 vp(vec2 u){float z=lz(u);return vec3((u*2.-1.)*pr*z,-z);}
+  float hh(vec2 p){return fract(sin(dot(p,vec2(12.9898,78.233)))*43758.5453);}
+  float ssao(vec2 u){vec3 p=vp(u);float z=-p.z;if(z>nf.y*0.6)return 1.;
+   vec3 r=vp(u+vec2(px.x,0.))-p,l=p-vp(u-vec2(px.x,0.)),up=vp(u+vec2(0.,px.y))-p,dn=p-vp(u-vec2(0.,px.y));
+   vec3 n=normalize(cross(abs(r.z)<abs(l.z)?r:l,abs(up.z)<abs(dn.z)?up:dn));
+   vec2 rad=clamp(vec2(26.)/(2.*z*pr),vec2(px*2.),vec2(0.09));float a=hh(u/px)*6.2832,o=0.;
+   for(int i=0;i<12;i++){float fi=float(i),k=(fi+0.6)/12.;vec2 of=vec2(cos(a+fi*2.4),sin(a+fi*2.4))*rad*k;vec3 q=vp(u+of)-p;float d=length(q)+1e-3;o+=max(0.,dot(n,q)/d-0.12)*(1.-smoothstep(8.,46.,d));}
+   return mix(1.-clamp(o/12.*2.3*aoK,0.,0.85),1.,smoothstep(1400.,3600.,z));}
   vec3 tm(vec3 x){x=max(x,0.)*ex/0.6;return clamp((x*(2.51*x+0.03))/(x*(2.43*x+0.59)+0.14),0.,1.);}
   float h(vec2 p){return fract(sin(dot(p,vec2(12.9898,78.233)))*43758.5453);}
   void main(){vec3 hc=texture2D(t,v).rgb;vec3 c=tm(hc),n=tm(texture2D(t,v+vec2(0.,px.y)).rgb),s=tm(texture2D(t,v-vec2(0.,px.y)).rgb),e=tm(texture2D(t,v+vec2(px.x,0.)).rgb),w=tm(texture2D(t,v-vec2(px.x,0.)).rgb);
    vec3 mn=min(c,min(min(n,s),min(e,w))),mx=max(c,max(max(n,s),max(e,w)));vec3 a=sqrt(clamp(min(mn,1.-mx)/max(mx,vec3(1e-3)),0.,1.))*(-1./5.5);c=clamp((c+(n+s+e+w)*a)/(1.+4.*a),0.,1.);
    vec3 g=vec3(0.);for(int i=0;i<8;i++){float an=float(i)*0.7854+0.4;vec2 o=vec2(cos(an),sin(an));g+=max(texture2D(t,v+o*px*5.).rgb-1.05,0.)+max(texture2D(t,v+o*px*13.).rgb-1.05,0.)*0.6;}c+=tm(g/12.8)*0.55;
    float l=dot(c,vec3(.2126,.7152,.0722));c=mix(vec3(l),c,1.14*sat);c=mix(c,c*c*(3.-2.*c),0.32);c+=(l-0.5)*vec3(0.035,0.006,-0.04);
+   if(aoK>0.)c*=ssao(v);if(aoK>1.5)c=vec3(ssao(v));
    vec2 q=v-0.5;c*=1.-dot(q,q)*0.5;c+=(h(v*vec2(1./px.x,1./px.y)+fract(time)*61.)-0.5)*0.022;
    c=clamp(c,0.,1.);gl_FragColor=vec4(mix(c*12.92,1.055*pow(c,vec3(1./2.4))-0.055,step(0.0031308,c)),1.);}`});
  const sc=new THREE.Scene(),q=new THREE.Mesh(new THREE.PlaneGeometry(2,2),mat);q.frustumCulled=false;sc.add(q);FX={rt,mat,sc,cam:new THREE.OrthographicCamera(-1,1,1,-1,0,1),sz:new THREE.Vector2(sz.x,sz.y),v:new THREE.Vector2()};}catch(e){console.warn('film pass unavailable',e);FX=null;}}
 function drawFrame(){GTKU.value=FX&&qual>0?0.62:1;if(FX&&qual>0){ren.getDrawingBufferSize(FX.v);if(FX.v.x!==FX.sz.x||FX.v.y!==FX.sz.y){FX.sz.copy(FX.v);FX.rt.setSize(FX.v.x,FX.v.y);FX.mat.uniforms.px.value.set(1/FX.v.x,1/FX.v.y);}
-  FX.mat.uniforms.time.value=time;{const u=FX.mat.uniforms.sat,tg=P.dead>0&&!MENU?0.12:1;u.value+=(tg-u.value)*0.08;}ren.setRenderTarget(FX.rt);ren.render(scene,cam3);ren.setRenderTarget(null);ren.render(FX.sc,FX.cam);}else ren.render(scene,cam3);}let GT=null,GTG=null,gAttrT=0,gReady=false,rayBudget=0,gDt=0.016,CW=null,COUNTY=null;const STATIC=[];
+  FX.mat.uniforms.time.value=time;{const th=Math.tan(cam3.fov*PI/360);FX.mat.uniforms.pr.value.set(th*cam3.aspect,th);FX.mat.uniforms.nf.value.set(cam3.near,cam3.far);}{const u=FX.mat.uniforms.sat,tg=P.dead>0&&!MENU?0.12:1;u.value+=(tg-u.value)*0.08;}ren.setRenderTarget(FX.rt);ren.render(scene,cam3);ren.setRenderTarget(null);ren.render(FX.sc,FX.cam);}else ren.render(scene,cam3);}let GT=null,GTG=null,gAttrT=0,gReady=false,rayBudget=0,gDt=0.016,CW=null,COUNTY=null;const STATIC=[];
 /* ---------- Google ground: with 3D Tiles on, heights come from the photogrammetry mesh, so bridges, ramps and underpasses work, and the world continues past the downtown map ---------- */
 const RC=new THREE.Raycaster(),RDN=new THREE.Vector3(0,-1,0),RO=new THREE.Vector3(),RDIR=new THREE.Vector3();
 const OOB=(x,y)=>x<0||y<0||x>=WW||y>=WH;
@@ -833,13 +864,35 @@ const SUNV=new THREE.Vector3(-0.45,0.78,0.42).normalize();
    crosses the southern sky and sets in the west at 20:00; the moon takes over as a dim blue light. ---------- */
 let TOFF=(()=>{const h=parseFloat(new URLSearchParams(location.search).get('hour'));return isFinite(h)?(h*60-540+1440)%1440:0;})();
 const gmin=()=>(540+time+TOFF)%1440,NIGHT={value:0},DN={k:1,inset:false,lit:[],pool:[],pt:0,sunC:new THREE.Color(),c0:new THREE.Color(0xff8a4a),c1:new THREE.Color(0xfff1d6),cm:new THREE.Color(0x8fa8ff),f0:new THREE.Color(0xc3d0dc),f1:new THREE.Color(0x0a1220),f2:new THREE.Color(0xe9b48a)};
+let SKY=null;
+function mkSky(){const m=new THREE.ShaderMaterial({side:THREE.BackSide,depthWrite:false,fog:false,uniforms:{sunD:{value:new THREE.Vector3(0,1,0)},moonD:{value:new THREE.Vector3(0,1,0)},day:{value:1},night:{value:0},t:{value:0},k:{value:1}},
+ vertexShader:'varying vec3 d;void main(){d=position;gl_Position=projectionMatrix*modelViewMatrix*vec4(position,1.);gl_Position.z=gl_Position.w*0.99995;}',
+ fragmentShader:`precision highp float;varying vec3 d;uniform vec3 sunD,moonD;uniform float day,night,t,k;
+ float h(vec2 p){return fract(sin(dot(p,vec2(127.1,311.7)))*43758.5453);}
+ float n2(vec2 p){vec2 i=floor(p),f=fract(p);f=f*f*(3.-2.*f);return mix(mix(h(i),h(i+vec2(1.,0.)),f.x),mix(h(i+vec2(0.,1.)),h(i+vec2(1.,1.)),f.x),f.y);}
+ float fbm(vec2 p){float a=.5,s=0.;for(int i=0;i<5;i++){s+=a*n2(p);p=p*2.03+17.;a*=.5;}return s;}
+ void main(){vec3 v=normalize(d);float up=max(v.y,0.),hz=pow(1.-up,3.5),se=sunD.y,sd=max(dot(v,sunD),0.);
+  vec3 zen=mix(vec3(0.004,0.008,0.022),vec3(0.10,0.27,0.72),day),hor=mix(vec3(0.012,0.018,0.04),vec3(0.60,0.75,0.93),day);
+  float gold=day*(1.-smoothstep(0.05,0.5,se));hor=mix(hor,vec3(1.0,0.50,0.20),gold*(0.3+0.7*pow(sd,2.5)));zen=mix(zen,vec3(0.22,0.20,0.46),gold*0.55);
+  vec3 c=mix(zen,hor,hz);
+  c+=vec3(1.0,0.72,0.42)*pow(sd,10.)*0.4*min(1.,day*3.);c+=vec3(1.0,0.95,0.86)*smoothstep(0.99955,0.9998,sd)*30.*step(-0.02,se)*min(1.,day*4.+gold);
+  float md=max(dot(v,moonD),0.);c+=(vec3(0.85,0.9,1.0)*smoothstep(0.9996,0.99975,md)*1.6+vec3(0.25,0.33,0.6)*pow(md,80.)*0.12)*night;
+  vec3 q=v*190.,qi=floor(q),qf=fract(q)-0.5;float sr=h(qi.xy+qi.z*13.7);c+=vec3(0.9,0.93,1.0)*step(0.992,sr)*smoothstep(0.16,0.02,length(qf))*night*smoothstep(0.03,0.3,v.y)*(0.5+0.5*sin(t*1.7+sr*90.))*0.9;
+  vec2 cp=v.xz/(v.y+0.2)*1.5+vec2(t*0.006,t*0.003);float f=fbm(cp),cl=smoothstep(0.46,0.8,f)*smoothstep(-0.02,0.2,v.y);
+  vec3 cc=mix(vec3(0.02,0.025,0.04),vec3(1.0,0.98,0.96),day);cc=mix(cc,vec3(1.0,0.58,0.36),gold*0.75*(0.4+0.6*sd));cc*=0.72+0.4*fbm(cp*2.4+5.);c=mix(c,cc,cl*0.88);
+  gl_FragColor=vec4(c/max(k,0.2),1.);
+  #include <tonemapping_fragment>
+  #include <colorspace_fragment>
+ }`});
+ SKY=new THREE.Mesh(new THREE.SphereGeometry(4800,32,18),m);SKY.frustumCulled=false;SKY.renderOrder=-10;scene.add(SKY);}
 function dayNight(){const h=gmin()/60,ss=(a,b,x)=>{const t=clamp((x-a)/(b-a),0,1);return t*t*(3-2*t);};
  const dt_=(h-6)/14,isDay=dt_>0&&dt_<1,nt=((h+4)%24)/10,u=isDay?dt_:nt,el=Math.sin(u*PI)*(isDay?1.0:0.8),az=u*PI;
  SUNV.set(Math.cos(az)*Math.cos(Math.max(el,0.14)),Math.sin(Math.max(el,0.14)),Math.sin(az)*Math.cos(Math.max(el,0.14))+0.18).normalize();
  const up=Math.sin(el),day=isDay?ss(0.0,0.3,up):0,night=1-(isDay?ss(-0.02,0.16,up):0);NIGHT.value=night;
  if(DN.inset){sun.intensity=0.8;sun.color.copy(DN.c1);DN.k=1;}
  else{if(isDay){sun.color.copy(DN.c0).lerp(DN.c1,ss(0.08,0.5,up));sun.intensity=2.6*ss(0.0,0.3,up);}else{sun.color.copy(DN.cm);sun.intensity=0.5*ss(0.0,0.25,up);}DN.k=0.3+0.7*(1-night);}
- scene.backgroundIntensity=DN.inset?1:1-0.94*night;if(scene.fog){const gold=isDay?(1-ss(0.1,0.45,up))*(1-night):0;scene.fog.color.copy(DN.f0).lerp(DN.f2,gold*0.55).lerp(DN.f1,night);}
+ if(!SKY)mkSky();{const U=SKY.material.uniforms;SKY.position.copy(cam3.position);U.day.value=1-night;U.night.value=night;U.t.value=time;U.k.value=DN.k;if(isDay){U.sunD.value.copy(SUNV);U.moonD.value.set(-SUNV.x,-0.3,-SUNV.z).normalize();}else{U.moonD.value.copy(SUNV);U.sunD.value.set(-SUNV.x,-0.25,-SUNV.z).normalize();}if(scene.background&&scene.background.isTexture)scene.background=null;}
+if(scene.fog){const gold=isDay?(1-ss(0.1,0.45,up))*(1-night):0;scene.fog.color.copy(DN.f0).lerp(DN.f2,gold*0.55).lerp(DN.f1,night);}
  if(FX)FX.mat.uniforms.ex.value=0.86*DN.k;ren.toneMappingExposure=0.82*DN.k;
  const boost=1/Math.max(DN.k,0.3);for(const m of [MAT.tlNS,MAT.tlEW])if(m)m.color.multiplyScalar(boost);
  if(DN.glow){DN.glow.visible=night>0.05;DN.glowM.color.setRGB(3.2*night*boost,2.5*night*boost,1.5*night*boost);}

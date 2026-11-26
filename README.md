@@ -162,3 +162,12 @@ Add `?hour=22` (any hour, decimals allowed) to the address to start at that time
 
 Building walls are also shaded darker toward the ground so they sit on the street instead of floating on it (`bot` in `tools/citygen.py`).
 
+## Rendering
+
+- **Sky:** drawn by a shader instead of a photo: colour follows the sun, with a sun disc, sunset and sunrise tones, drifting clouds, a moon and stars.
+- **Ambient occlusion:** the film pass reads scene depth and darkens corners, the foot of walls, under cars and inside foliage (desktop only; add `?aodbg` to see that layer alone).
+- **Buildings:** every facade texture has a relief map (`tools/normals.py` writes `tex/b/*_n.jpg`), and each window shows a room behind the glass, worked out per pixel from the viewing angle. Rooms light up at night.
+- **Ground:** asphalt, concrete and grass get relief from their own texture, and streets have wet patches that reflect the sky and lamps.
+
+The film pass switches itself off on devices that cannot hold 25 frames a second, which also removes ambient occlusion and glow.
+
