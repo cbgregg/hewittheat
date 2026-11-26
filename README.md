@@ -231,3 +231,28 @@ Hewitt Ave from Colby to Oakes is the first stretch set this way (48 footprints,
 | Storefronts only on sides that face a street, blank walls where a neighbour touches | 1,425 non-house buildings |
 
 Wall materials are still generated from the building kind except where `tools/blocks.py` sets them. LiDAR also corrected which footprint is the county administration tower (3000 Rockefeller Ave, 94 ft).
+
+## Streets, junctions and trees
+
+`tools/streets.py` (called by `tools/citygen.py`) builds every street from the network as junction-to-junction runs:
+
+- Kerbs with rounded corner returns, sidewalks (3.6 m downtown, 2.2 m elsewhere, narrowed where a building stands), a separate kerb cap, tactile pads at crossings, tree pits downtown.
+- Paint: double yellow centre lines, dashed lane lines and edge lines on the four-lane streets, parking lanes with stall ticks downtown, continental crosswalks, stop lines on the approach lanes, manhole covers and corner drains.
+- The road channel of `data/mask.png` is redrawn from the same geometry, so asphalt runs exactly kerb to kerb (`data/mask_roads0.png` keeps the earlier mask).
+- `data/street.json`: what the game stands up at each junction.
+
+Junction control:
+
+| Junction | Count | How it is chosen |
+|---|---|---|
+| Signalised | 67 | The city's pedestrian push-button records name every signalised intersection (`data/dossier/signals.json`); the map had 23 before |
+| Stop signs | 198 signs | Side streets meeting a wider street; all-way stops where equal streets meet downtown |
+| Uncontrolled | the rest | Residential junctions of equal streets |
+
+In the game each signal approach gets a pole with a tapered mast arm and a street-light arm, heads with backplates, yellow reflective borders and tunnel visors (one per lane on the arm, one on the pole), pedestrian heads showing a walking figure, then a flashing hand with a countdown, a push button, a street-name blade on the arm and a controller cabinet on one corner. The cycle is 44 seconds: green, 3.5 seconds of yellow, then 2.5 seconds with every direction red. Stop signs carry both street names on blades. Traffic stops at the new stop lines at signals; it does not yet stop at stop signs.
+
+Trees: `tools/treegen.py` builds six tree models procedurally (maple, bigleaf maple, columnar street tree, cherry, Douglas fir, western red cedar): bark-textured trunks with real branches and crowns of alpha-cut leaf cards that shade as one mass and sway in the wind. `tools/trees.py` places 13,054 of them in `data/trees.json`: 11,557 where Snohomish County's 2020 tree canopy layer shows canopy, sized to the canopy patch, with evergreens told apart from broadleaf trees by which spots are dark green in the county's leaf-off March 2024 aerial; and 1,497 kerbside street trees downtown and on the wide streets. Nothing stands on a road, a building or water.
+
+`tools/gshot.py OUT.png "x,y,up,tx,ty,tup"` takes stills from the running game in headless Chrome, at any map position and hour.
+
+Rebuild order: `tools/treegen.py`, `tools/citygen.py . data/city.glb quant`, `tools/trees.py`.
