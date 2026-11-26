@@ -173,6 +173,19 @@ def build(BF, W, Hat, bsolid, CORE, lin, EXTRA, sig_nodes, repo):
 
     CHAINS, LEG = chains(W, CORE)
     JUNC = set(LEG)
+    LANES = []
+    try:
+        import blocks as _bl
+        PARKING = getattr(_bl, 'PARKING', [])
+    except Exception:
+        PARKING = []
+    for ch in CHAINS:
+        my_ = pt(ch, ch['L'] / 2, 0)[1]
+        if any(NAMES[ch['nm']] == nm_ and ya < my_ < yb for nm_, ya, yb, sd in PARKING):
+            ch['core'] = True; ch['sw'] = 36.0          # a downtown block by what the aerial shows, whatever the core box says
+            for L_ in (ch['A'], ch['B']):
+                if L_:
+                    L_['core'] = True; L_['sw'] = 36.0
     MED = []
     mf = repo + '/data/dossier/streets.json'
     if os.path.exists(mf):
@@ -358,9 +371,21 @@ def build(BF, W, Hat, bsolid, CORE, lin, EXTRA, sig_nodes, repo):
                 if a_ < t1:
                     parts.append((a_, t1))
                 return parts
+            # parking seen in the aerials (PARKING in tools/blocks.py): 45 degree stalls on one side, parallel on the other,
+            # and the centre line moved off-centre to suit, as on the real street
+            sh_, pk = 0.0, None
+            for nm_, ya, yb, sd in PARKING:
+                my_ = pt(ch, ln / 2, 0)[1]
+                if NAMES[ch['nm']] == nm_ and ya < my_ < yb and w >= 132 and not ch['med']:
+                    es = 1 if pt(ch, ln / 2, 1)[0] > pt(ch, ln / 2, 0)[0] else -1
+                    an = es if sd == 'E' else -es
+                    pk = {an: 52.0, -an: 23.0}; sh_ = -an * 14.5
+                    lo = (w - 75) / 4
+                    for k_ in range(len(ch['eids'])):
+                        LANES.append([ch['ids'][k_], ch['ids'][k_ + 1], sh_, round(lo, 1)])
             if marked:
                 for a_, b_ in split(m0, m1):
-                    cline(ch, a_, b_, -1.5, 1.2, YELLOW); cline(ch, a_, b_, 1.5, 1.2, YELLOW)
+                    cline(ch, a_, b_, sh_ - 1.5, 1.2, YELLOW); cline(ch, a_, b_, sh_ + 1.5, 1.2, YELLOW)
                 for ma, mb in ch['med']:
                     for s_ in (-1, 1):
                         cline(ch, max(m0, ma), min(m1, mb), s_ * 19, 1.2, YELLOW)
@@ -371,10 +396,10 @@ def build(BF, W, Hat, bsolid, CORE, lin, EXTRA, sig_nodes, repo):
             elif marked:
                 # parking by what fits beside the traffic lane at the real kerb-to-kerb width:
                 # 45 degree stalls need 5.2 m, parallel stalls 2.3 m
-                depth = 52.0 if (w / 2 - 52 >= lane_o + 7.5 and not ch['med']) else 23.0 if w / 2 - 23 >= lane_o + 13 else 0
-                ch['park'] = depth
-                if depth:
+                depth0 = 52.0 if (w / 2 - 52 >= lane_o + 7.5 and not ch['med']) else 23.0 if w / 2 - 23 >= lane_o + 13 else 0
+                if depth0 or pk:
                     for s_ in (-1, 1):
+                        depth = pk[s_] if pk else depth0
                         cline(ch, m0 + 20, m1 - 20, s_ * (w / 2 - depth), 1.0, WHITE)
                         t = m0 + 22
                         while t < m1 - 22 - (depth if depth > 30 else 0):
@@ -483,7 +508,7 @@ def build(BF, W, Hat, bsolid, CORE, lin, EXTRA, sig_nodes, repo):
         stat['median'] = stat.get('median', 0) + 1
 
     # ---------- what the game stands up ----------
-    out = dict(r={}, signals=[], stops=[], names=NAMES, xw=[], stopleg=[])
+    out = dict(r={}, signals=[], stops=[], names=NAMES, xw=[], stopleg=[], lanes=LANES)
     for ni, legs in LEG.items():
         if ni in CTRL:
             out['r'][ni] = round(max(L['bar'] for L in legs) + 4)

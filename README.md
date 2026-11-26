@@ -258,3 +258,13 @@ Trees: `tools/treegen.py` builds six tree models procedurally (maple, bigleaf ma
 `tools/gshot.py OUT.png "x,y,up,tx,ty,tup"` takes stills from the running game in headless Chrome, at any map position and hour.
 
 Rebuild order: `tools/treegen.py`, `tools/street_data.py`, `tools/trees.py detect`, `tools/citygen.py . data/city.glb quant`, `tools/trees.py`.
+
+### Wetmore Ave
+
+Wetmore is done end to end (23rd St to 37th St) from five dossiers (`wetmore_n`, `wetmore_c1`, `wetmore_c2`, `wetmore_s1`, `wetmore_s2`): 220 footprints, 99 of them not houses.
+
+- Downtown (26th St to Pacific Ave): 37 buildings set by hand in `tools/blocks.py` with measured heights, roofs from the aerials, storefronts on street sides and blank party walls.
+- Outside downtown: 34 apartment and office buildings whose aerial shows a pitched shingle roof are now house-form (gabled, siding) instead of flat-roofed blocks.
+- Parking is as painted in the county aerial (`PARKING` in `tools/blocks.py`): 45 degree stalls on the east side from 26th St to Hewitt and on the west side from Hewitt to Pacific, parallel on the other side, with the centre line and the traffic lanes moved off-centre to match.
+- Public and listed buildings take their materials from written references: the National Register forms for the 1929 City Hall (3002) and the 1921 Knights of Columbus building (1611 Everett Ave), the Everett Register nomination for the Bank of Everett of 1963 (2730), Historic Everett's walking tour for the Port Gardner Building (2802), and the Hewitt district nomination for the IOOF Hall (2813).
+- Not verified: 2721 Wetmore is newer than the LiDAR survey, so its 44 ft is estimated from its shadow. Wall materials of the unlisted buildings are inferred. The Performing Arts Center, Municipal Building and Municipal Court have no written description of their walls in these sources.

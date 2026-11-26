@@ -179,3 +179,79 @@ grp([4400, 4409], DARK_R, wall='f_brick_red', tint='#ecdcd4', shop='shop_brick',
 grp([4401, 4402], DARK_R, wall='f_brick_dark', tint='#e4e6ea', shop='shop_modern', shopon='N', blank='EWS', hft=17)
 # Watson's Bakery, 1812 Hewitt (R: Everett Register): 2 storeys (25 ft), white roof, red brick with a maroon parapet cap (W: 2022 aerial)
 grp([4403, 4412], WHITE_R, wall='f_brick_red', tint='#f6e2da', shop='shop_brick', shopon='N', blank='W', hft=28)
+
+
+# ---------------------------------------------------------------------------------------------------------------
+# Wetmore Ave, end to end (23rd St to 37th St): from the dossiers wetmore_n, wetmore_c1, wetmore_c2, wetmore_s1, wetmore_s2.
+# Heights, flat-roof colours, grouping and street sides come from the whole-map pass (data/dossier/auto.json).
+# Set here: what the aerials show beyond that. Wall basis as above: W seen, R record, D inferred.
+# ---------------------------------------------------------------------------------------------------------------
+# parking as painted in the county 2024 aerial: (street, from y, to y, side with the 45 degree stalls); the other side is parallel
+PARKING = [
+    ('Wetmore Ave', 7508, 8936, 'E'), ('Wetmore Ave', 8936, 10424, 'E'), ('Wetmore Ave', 10424, 11924, 'E'),
+    ('Wetmore Ave', 11924, 13464, 'W'), ('Wetmore Ave', 13464, 14943, 'W'),
+]
+SH_DARK, SH_MID, SH_BROWN, SH_LIGHT = '#4a4d52', '#6e7074', '#6b584c', '#a9adb0'
+_SIDING = ['#d9d4c4', '#8c9096', '#e6e2d6', '#6f8aa3', '#b9a88c', '#a7abae', '#7d8c75', '#8fa6b5']
+
+
+def gabled(ids, roof):
+    """the aerial shows a pitched shingle roof: a house-form building (apartments or offices in a house), not a flat-roofed block. Siding colour is D."""
+    for i in ids:
+        B[i] = dict(wall='f_siding', tint=_SIDING[i % len(_SIDING)], roof='r_shingle', rtint=roof, pitched=True, shop=None, units=False)
+
+
+# --- 22nd to 26th St: apartments and a church among houses
+gabled([2795, 5954, 3319, 3975, 3990, 4002, 4018, 4032], SH_DARK)
+gabled([2856, 3148, 3933], SH_BROWN)
+B[2885] = dict(wall='f_siding', tint='#e6e2d6', roof='r_shingle', rtint=SH_DARK, pitched=True, shop=None, units=False)   # 2228 Wetmore, church: cross-gabled dark roof (W)
+# --- 2600 block (26th St to Everett Ave)
+gabled([4121, 4124], SH_DARK)                                                                    # 2623-2625: offices and a garage in gabled buildings (W roof)
+B[4127] = dict(wall='f_cmu', tint='#cfcabd', roof='r_gravel', rtint='#4d4f4c', shop=None)        # 2631, auto repair: dark flat roof, tan shed at the back (W roof)
+B[4072] = dict(wall='f_stucco', tint='#e4dfd2', shop=None)                                       # 2612, medical: L-shaped single storey round a car park
+grp([4078], GREY_R, wall='f_cmu', tint='#d8d5cc', shop=None)                                     # 2605, contractor: plain single storey
+grp([4083], LIGHT_R, wall='f_stucco', tint='#e9e4d6', shop='shop_modern', shopon='W')
+grp([4087, 4090], LIGHT_R, wall='f_stucco', tint='#ddd8ca', shop='shop_modern', shopon='W')      # 2609-2611: one single-storey shop building
+# Apex Art and Culture Center, 1611 Everett Ave (built 1921 for the Knights of Columbus, later the Masonic Temple). R: the register nomination
+# gives red "burlap brick" on the Everett and Wetmore fronts, three storeys, and a roof overhang on brackets; the aerial shows that overhang in red tile (W)
+B[4123] = dict(wall='f_brick_red', tint='#f6e2da', roof='r_membrane', rtint='#f0f1ee', shop='shop_brick', shopon='SE', awn='#a5553c', hft=48)
+# --- 2700 block (Everett Ave to California St)
+grp([4145], DARK_R, wall='f_brick_red', tint='#f3e6df', shop='shop_brick', shopon='WN', blank='S', hft=35)     # 2701: 3 storeys (32 ft), dark roof
+grp([4154], GREY_R, wall='f_brick_dark', tint='#f0ece8', shop='shop_brick', shopon='W', blank='NS', hft=27)    # 2709: narrow 2-storey
+# 2721: new apartment block with a rooftop solar array and a courtyard cut into the east side (W). No LiDAR yet (built after the survey):
+# 4 storeys / 44 ft is estimated from the shadow it casts on 2709
+B[6373] = dict(wall='f_panel', tint='#eceae4', stripe=('#5a5f66', 70, 3), roof='r_membrane', rtint='#d8dad6', shop='shop_modern', shopon='W', hft=44, units=False)
+grp([4188], DARK_R, wall='f_brick_red', tint='#e2d6d2', shop='shop_brick', shopon='W', blank='NS', hft=31)
+grp([4195], GREY_R, wall='f_concrete', tint='#efece4', shop='shop_modern', shopon='WS', hft=56)                 # 2731, offices: 4 storeys (53 ft), grey roof with plant
+# --- 2800 block (California St to Hewitt Ave)
+# Port Gardner Building, 2802 Wetmore: built 1929 as Rumbaugh's department store, later the Bon Marche, now Funko's headquarters and shop.
+# R: Historic Everett's walking tour gives a cream-taupe ornamental terra cotta exterior; 5 storeys, white roof (W)
+grp([4235, 4243], WHITE_R, wall='f_concrete', tint='#f4ead6', shop='shop_buff', shopon='NE', blank='S', hft=56)
+grp([4257], DARK_R, wall='f_brick_dark', tint='#e4e6ea', shop='shop_modern', shopon='E', blank='NS', hft=17)
+grp([4263], DARK_R, wall='f_brick_red', tint='#ecdcd4', shop='shop_brick', shopon='E', blank='N', hft=34)           # 2818: 2 storeys, dark ribbed roof (W)
+grp([4253, 4260], GREY_R, wall='f_brick_red', tint='#f6e2da', shop='shop_brick', shopon='W', blank='NS', hft=55)    # IOOF Hall, 2813-2815 (R: built 1912, contributing to the Hewitt historic district, brick): 4 storeys (52 ft), weathered roof with a skylight grid (W)
+# 2817 Salvation Army (1918), 2819 Robinson Building (about 1947), 2821 (1909): names and dates from the district nomination (R); walls D
+grp([4266], LIGHT_R, wall='f_brick_buff', tint='#eee6d6', shop='shop_buff', shopon='W', blank='NS', hft=33)
+grp([4271], LIGHT_R, wall='f_stucco', tint='#e9e4d6', shop='shop_modern', shopon='W', blank='NS', hft=22)
+grp([4286], GREY_R, wall='f_brick_dark', tint='#f0ece8', shop='shop_brick', shopon='W', blank='NS', hft=20)
+# --- 2900 block (Hewitt Ave to Wall St)
+B[6385] = dict(wall='f_cmu', tint='#d0d0cc', roof='r_membrane', rtint='#9a9c96', shop=None, hft=10, units=False)   # car park attendant's booth
+grp([4498], DARK_R, wall='f_brick_dark', tint='#e4e6ea', shop='shop_modern', shopon='W', blank='S', hft=17)
+grp([4502], WHITE_R, wall='f_stucco', tint='#efe8d8', shop='shop_modern', shopon='W', blank='NS', hft=15)      # 2925, restaurant
+grp([4511], WHITE_R, wall='f_stucco', tint='#e4dfd2', shop='shop_modern', shopon='W', blank='NS', hft=17)
+grp([4532], GREY_R, wall='f_brick_red', tint='#f3e6df', shop='shop_brick', shopon='W', blank='NS', hft=17)
+grp([4543, 4551, 4557], LIGHT_R, wall='f_cmu', tint='#dcd9d0', shop=None, blank='N', hft=21)                    # 2931-2933, printing works: one single-storey building
+# --- 3000 block (Wall St to Pacific Ave)
+# 3002 Wetmore, Everett City Hall of 1929, now police and council chamber. R: the National Register form gives Art Deco, four storeys,
+# buff brick with terra cotta, flat roof, built up in setbacks; brown gravel roofs in the aerial (W)
+B[6095] = dict(wall='f_brick_buff', tint='#f4e8cc', roof='r_gravel', rtint='#6f6654', shop=None, hft=46, pent=(150, 190, 12, '#e6dcc2', -30, -20))
+B[5992] = dict(wall='f_brick_buff', tint='#f2f2f2', roof='r_membrane', rtint='#f0f0ec', shop=None, hft=25)       # 3028, municipal court: 2 storeys, white roof (W)
+# --- south of Pacific Ave: flat-roofed blocks keep the measured looks; these are the house-form ones
+gabled([5816, 4789, 4814, 4867, 4894, 4908, 4910, 5900, 5228, 5284, 5314, 5342, 5416, 5440, 5465, 5524, 5670, 5950], SH_MID)
+gabled([4745], SH_BROWN)
+gabled([4882], SH_LIGHT)                                                                         # 3314: pale grey gabled roof (W)
+# Bank of Everett of 1963, now the Cope Gillette Theatre, 2730 Wetmore (Everett Register). R: mid-century, arches on slender white columns,
+# gold Italian glass tile and large clear and amber windows, an umbrella-shell roof overhang. Drawn as amber glazing under a white overhang
+B[4200] = dict(wall='f_glass', tint='#e3c06a', roof='r_membrane', rtint='#f2f2ee', shop=None, awn=None, hft=24)
+# Everett Municipal Building (the Wall Street Building until 2024), 2930 Wetmore. R: ten floors, 147 ft, finished in 1983. The glass colour is still from the flyover notes
+B[4539] = dict(B.get(4539, {}), hft=147)

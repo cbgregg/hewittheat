@@ -2,7 +2,7 @@ import * as THREE from 'three';
 import {GLTFLoader} from 'three/addons/loaders/GLTFLoader.js';
 import {clone as skClone} from 'three/addons/utils/SkeletonUtils.js';
 /* Downtown Everett built from City of Everett GIS data: street centerlines, building footprints, 2 ft contours, parks, bus stops, 2022 aerial imagery. 10 units = 1 m, one tile = 2 m. */
-const PI=Math.PI,T=20,DV='?v=1126e';
+const PI=Math.PI,T=20,DV='?v=1126f';
 let MW=0,MH=0,WW=0,WH=0,map=new Uint8Array(1),HMAP=null,gw=0,gh=0,GS=80,WORLD=null;
 const WATER=0,GRASS=1,ROAD=2,WALK=3,BLDG=4,PARK=5,CONC=6,HOUSE=7;
 const SOL=[1,0,0,0,1,0,0,0];
@@ -22,7 +22,7 @@ function nearestTile(cx,cy,type,maxr){cx=Math.floor(cx);cy=Math.floor(cy);let be
  return best;}
 const nodes=[],edges=new Map(),egrid=new Map();let LM=[],DEST=[],STOPS=[],SPOTS=[],PKG=[],AIRIMG=[];
 const lm=n=>LM.find(l=>l.n===n);
-function lane(ai,bi){const A=nodes[ai],B=nodes[bi];let dx=B.x-A.x,dy=B.y-A.y;const L=Math.hypot(dx,dy)||1;dx/=L;dy/=L;const e=edges.get(ai*65536+bi)||{o:16,lim:108};return{sx:A.x-dy*e.o,sy:A.y+dx*e.o,dx,dy,L,lim:e.lim};}
+function lane(ai,bi){const A=nodes[ai],B=nodes[bi];let dx=B.x-A.x,dy=B.y-A.y;const L=Math.hypot(dx,dy)||1;dx/=L;dy/=L;const e=edges.get(ai*65536+bi)||{o:16,lim:108},o=e.o+(LSH.get(ai*65536+bi)||0);return{sx:A.x-dy*o,sy:A.y+dx*o,dx,dy,L,lim:e.lim};}
 function nearestNode(x,y){let b=0,bd=1e9;for(let i=0;i<nodes.length;i++){const d=Math.abs(nodes[i].x-x)+Math.abs(nodes[i].y-y);if(d<bd){bd=d;b=i;}}return b;}
 function streetAt(x,y){const cx=Math.floor(x/600),cy=Math.floor(y/600);let bn=null,bd=1e9;
  for(let j=-1;j<=1;j++)for(let i=-1;i<=1;i++){const l=egrid.get((cx+i)+','+(cy+j));if(!l)continue;for(const [a,b,e] of l){const A=nodes[a],B=nodes[b],dx=B.x-A.x,dy=B.y-A.y,t=clamp(((x-A.x)*dx+(y-A.y)*dy)/(dx*dx+dy*dy||1),0,1),d=Math.hypot(A.x+dx*t-x,A.y+dy*t-y)-e.w/2;if(d<bd){bd=d;bn=e.name;}}}
@@ -689,6 +689,8 @@ function buildStatic2(){
  // pedestrian heads with countdowns, push buttons, controller cabinets, stop signs and street-name blades
  MAT.tlNS=new THREE.MeshBasicMaterial({color:0xff2020,toneMapped:false});MAT.tlEW=new THREE.MeshBasicMaterial({color:0x20ff40,toneMapped:false});
  {const ST=STREETD||{signals:[],stops:[],names:[],r:{}},V=(a,b,c)=>new THREE.Vector3(a,b,c);for(const k in ST.r)if(nodes[k])nodes[k].r=ST.r[k];
+  // streets whose centre line is off-centre (angle parking on one side): move the traffic lanes with it
+  for(const [a,b,sh,o] of ST.lanes||[]){const e=edges.get(a*65536+b);if(!e)continue;e.o=o;LSH.set(a*65536+b,sh);LSH.set(b*65536+a,-sh);}
   // stop signs: every edge that leads up to a stop-controlled approach knows the junction and how far beyond the edge it is
   for(const [J,k0] of ST.stopleg||[]){if(!nodes[J]||!nodes[k0])continue;let prev=J,cur=k0,d=0;STOPAHEAD.set(k0*65536+J,{n:J,d:0});d=dist(nodes[J].x,nodes[J].y,nodes[k0].x,nodes[k0].y);
    while(nodes[cur].nb.length===2&&d<320){const nx=nodes[cur].nb[0]===prev?nodes[cur].nb[1]:nodes[cur].nb[0];STOPAHEAD.set(nx*65536+cur,{n:J,d});prev=cur;cur=nx;d+=dist(nodes[prev].x,nodes[prev].y,nodes[cur].x,nodes[cur].y);}}
@@ -956,7 +958,7 @@ const SUNV=new THREE.Vector3(-0.45,0.78,0.42).normalize();
    crosses the southern sky and sets in the west at 20:00; the moon takes over as a dim blue light. ---------- */
 let TOFF=(()=>{const h=parseFloat(new URLSearchParams(location.search).get('hour'));return isFinite(h)?(h*60-540+1440)%1440:0;})();
 const gmin=()=>(540+time+TOFF)%1440,NIGHT={value:0},DN={k:1,inset:false,lit:[],pool:[],pt:0,sunC:new THREE.Color(),c0:new THREE.Color(0xff8a4a),c1:new THREE.Color(0xfff1d6),cm:new THREE.Color(0x8fa8ff),f0:new THREE.Color(0xc3d0dc),f1:new THREE.Color(0x0a1220),f2:new THREE.Color(0xe9b48a)};
-const TCELLS=[],WINDU={value:0},SIGAHEAD=new Map(),STOPAHEAD=new Map(),XWG=new Map();let RAIN=null,RAINON=false,RAINS=null;const RAINU={value:0};
+const TCELLS=[],WINDU={value:0},SIGAHEAD=new Map(),STOPAHEAD=new Map(),XWG=new Map(),LSH=new Map();let RAIN=null,RAINON=false,RAINS=null;const RAINU={value:0};
 function rainTick(dt){const tg=RAINON&&!DN.inset?1:0;RAINU.value+=(tg-RAINU.value)*Math.min(1,dt*0.9);
  if(!RAIN){const n=LOW?800:1900,p=new Float32Array(n*6),bb=new Float32Array(n*2);for(let i=0;i<n;i++){const x=(Math.random()-0.5)*760,z=(Math.random()-0.5)*760,y=Math.random()*400;p.set([x,0,z,x+1.6,-14,z+0.9],i*6);bb[i*2]=bb[i*2+1]=y;}
   const ge=new THREE.BufferGeometry();ge.setAttribute('position',new THREE.BufferAttribute(p,3));ge.setAttribute('b',new THREE.BufferAttribute(bb,1));
