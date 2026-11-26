@@ -35,7 +35,7 @@ async function loadWorld(){
  WORLD=await (await fetch('data/world.json')).json();try{CITY=(await new GLTFLoader().loadAsync('data/city.glb')).scene;}catch(e){console.warn('city model unavailable, using generated buildings',e);CITY=null;}
  try{EXTRA=Object.assign(EXTRA,await (await fetch('data/extras.json')).json());}catch(e){}
  await Promise.all(['lamp','signal','busstop','tree','pine','hydrant','bench','trash','excavator'].map(async k=>{try{PROPS[k]=(await new GLTFLoader().loadAsync('models/p_'+k+'.glb')).scene;}catch(e){console.warn('prop missing',k);}}));
- for(const k of ['office','chamber'])try{const g=(await new GLTFLoader().loadAsync('models/set_'+k+'.glb')).scene;g.visible=false;g.traverse(o=>{if(o.isMesh){o.castShadow=false;o.receiveShadow=/^floor|^shell/.test(o.name);}});const a=new THREE.PointLight(0xffe2bd,1.5,0,0);a.position.set(0,30,0);const b=new THREE.PointLight(0xdcebff,0.8,0,0);b.position.set(-30,24,-40);g.add(a,b);SETS[k]=g;}catch(e){console.warn('set missing',k);}MW=WORLD.mw;MH=WORLD.mh;WW=MW*T;WH=MH*T;
+ for(const k of ['office','chamber','bar'])try{const g=(await new GLTFLoader().loadAsync('models/set_'+k+'.glb')).scene;g.visible=false;g.traverse(o=>{if(o.isMesh){o.castShadow=false;o.receiveShadow=/^floor|^shell/.test(o.name);}});const LS=k==='bar'?[[0xffb070,1.7,0,24,6],[0xff4a32,0.6,-52,20,12],[0x35d6c2,0.35,-52,16,12],[0xffc890,1.0,0,20,-36]]:[[0xffe2bd,1.5,0,30,0],[0xdcebff,0.8,-30,24,-40]];for(const q of LS){const a=new THREE.PointLight(q[0],q[1],0,0);a.position.set(q[2],q[3],q[4]);g.add(a);}g.userData.k=k==='bar'?0.5:1;SETS[k]=g;}catch(e){console.warn('set missing',k);}MW=WORLD.mw;MH=WORLD.mh;WW=MW*T;WH=MH*T;
  const md=pixels(await loadImg('data/map.png'));map=new Uint8Array(MW*MH);for(let i=0;i<MW*MH;i++)map[i]=Math.round(md[i*4]/30);
  const hd=pixels(await loadImg('data/hm.png'));gw=WORLD.gw;gh=WORLD.gh;GS=WORLD.gs*10;HMAP=new Float32Array(gw*gh);for(let i=0;i<gw*gh;i++)HMAP[i]=((hd[i*4]<<8)|hd[i*4+1])-1000;
  if(window.EV_NOAIR)AIRIMG=[null,null,null,null,null,null];else{for(let ty=0;ty<2;ty++)for(let tx=0;tx<3;tx++)AIRIMG.push(loadImg('data/airlo_'+tx+'_'+ty+'.jpg').catch(()=>null));AIRIMG=await Promise.all(AIRIMG);}
@@ -220,10 +220,13 @@ function stStep(){const ch=M.ch;if(M.si>=0){const ps=ch.steps[M.si];if(ps&&ps.do
  else if(s.t==='steal'){let c=makeCar(l.curb.x,l.curb.y,0,s.kind||'civ',VSPEC[s.model]?s.model:null);if(carBlocked(c.x,c.y,0,c)){c.a=PI/2;if(carBlocked(c.x,c.y,c.a,c)){c.x=l.door.x;c.y=l.door.y;}}if(s.kind==='gold'){c.col='#d4af37';c.max=350;c.acc=270;}c.keep=true;c.park=true;M.car=c;M.tx=c.x;M.ty=c.y;}
  else if(s.t==='deliver'){M.dx=l.door.x;M.dy=l.door.y;M.tx=M.dx;M.ty=M.dy;}
  else if(s.t==='heat'){pts=Math.max(pts,TH[s.stars]);cool=0;M.hide=true;M.tx=P.x;M.ty=P.y;}
- else if(s.t==='scene'){M.hide=true;M.tx=P.x;M.ty=P.y;pts=0;cool=0;RQ.length=0;if(NOCUT){stStep();return;}const m=M;playScene(s.lines,ch.id+'_s'+M.si+'l',{},()=>{if(M===m)stStep();});return;}
+ else if(s.t==='scene'){M.hide=true;M.tx=P.x;M.ty=P.y;pts=0;cool=0;RQ.length=0;if(NOCUT){stStep();return;}const m=M;let un=null,opt={};
+  if(s.set&&SETS[s.set]){const L=lm(s.at||ch.at),w=(s.lines.find(q=>!q.r&&q.w!=='danny')||{}).w;if(P.car){const c=P.car;c.drv=null;c.v=0;c.lat=0;P.car=null;}const sv=[P.x,P.y,P.a];P.x=L.cx-11;P.y=L.cy+2;P.a=0;setShow(s.set,L.cx,L.cy,Math.max(Hat(L.cx-11,L.cy+2),Hat(L.cx+11,L.cy-2)));
+   let g=null;if(w){g=mkActor(w,L.cx+11,L.cy-2,PI);CONTACTS.push(g);opt={giver:g};}un=()=>{setHide();P.x=sv[0];P.y=sv[1];P.a=sv[2];if(g){const k=CONTACTS.indexOf(g);if(k>=0)CONTACTS.splice(k,1);}};}
+  playScene(s.lines,ch.id+'_s'+M.si+'l',opt,()=>{if(un)un();if(M===m)stStep();});return;}
  if(M.si>0)sfx('pick');}
 function beginChapter(ch){M={type:'story',ch,si:-1,time:0,reward:ch.reward,text:''};big={t:ch.title,c:'#40e0ff',time:2.2};sfx('job');stStep();}
-function setShow(name,cx,cy,hy){const S=SETS[name];if(!S)return null;for(const k in SETS)SETS[k].visible=false;S.position.set(cx,hy+0.6,cy);if(!S.parent)scene.add(S);S.visible=true;for(const m of STATIC)m.visible=false;DN.inset=true;return S;}
+function setShow(name,cx,cy,hy){const S=SETS[name];if(!S)return null;for(const k in SETS)SETS[k].visible=false;S.position.set(cx,hy+0.6,cy);if(!S.parent)scene.add(S);S.visible=true;for(const m of STATIC)m.visible=false;DN.inset=true;DN.insetK=S.userData.k||1;return S;}
 function setHide(){for(const k in SETS)SETS[k].visible=false;if(!(GT&&gReady))for(const m of STATIC)m.visible=true;DN.inset=false;}
 function stageOn(ch){if(!(ch.set&&SETS[ch.set])||P.car)return null;const g=ch.ped,l=lm(ch.at),cx=l.cx,cy=l.cy,sv=[P.x,P.y,P.a,g.x,g.y,g.a,g.fa];
  P.x=cx-11;P.y=cy+2;P.a=0;g.x=cx+11;g.y=cy-2;g.a=PI;g.fa=PI;setShow(ch.set,cx,cy,Math.max(Hat(cx-11,cy+2),Hat(cx+11,cy-2)));
@@ -268,7 +271,7 @@ function buildScene(lines,kp,o){o=o||{};const tmp=[],cast={};
  if(!o.cutaway)cast.danny=P;const g=o.giver;if(g){cast[g.cw]=g;const gd=dist(g.x,g.y,P.x,P.y);if(gd>26){const k=24/gd,nx=g.x+(P.x-g.x)*k,ny=g.y+(P.y-g.y)*k;if(!solidAt(nx,ny)&&los(nx,ny,g.x,g.y)){P.x=nx;P.y=ny;}}}
  const pres=[...new Set(lines.filter(l=>!l.r&&l.w!=='danny'&&!(CAST[l.w]||{}).remote).map(l=>l.w))].filter(w=>!cast[w]);
  const fa=g?Math.atan2(g.y-P.y,g.x-P.x):P.a,D0=o.cutaway?44:23,bx=g?g.x:P.x+Math.cos(fa)*D0,by=g?g.y:P.y+Math.sin(fa)*D0;
- pres.forEach((w,i)=>{const k=g?i+1:i,off=(k%2?1:-1)*Math.ceil(k/2)*15+(g||pres.length%2?0:7.5);let x=bx-Math.sin(fa)*off,y=by+Math.cos(fa)*off;if(solidAt(x,y)){x=P.x+Math.cos(fa)*18-Math.sin(fa)*off;y=P.y+Math.sin(fa)*18+Math.cos(fa)*off;}if(solidAt(x,y)){x=P.x-Math.sin(fa)*(off||12);y=P.y+Math.cos(fa)*(off||12);}
+ pres.forEach((w,i)=>{const k=g?i+1:i,off=(k%2?1:-1)*Math.ceil(k/2)*15+(g||pres.length%2?0:7.5);let x=bx-Math.sin(fa)*off,y=by+Math.cos(fa)*off;if((!DN.inset&&solidAt(x,y))){x=P.x+Math.cos(fa)*18-Math.sin(fa)*off;y=P.y+Math.sin(fa)*18+Math.cos(fa)*off;}if((!DN.inset&&solidAt(x,y))){x=P.x-Math.sin(fa)*(off||12);y=P.y+Math.cos(fa)*(off||12);}
   const ex=CONTACTS.find(q=>q.cw===w&&!q.actor&&dist(q.x,q.y,P.x,P.y)<260);if(ex){cast[w]=ex;ex.fa=Math.atan2(P.y-ex.y,P.x-ex.x);tmp.push(ex);return;}
   const a=mkActor(w,x,y,Math.atan2(P.y-y,P.x-x));a.hid=!!o.cutaway;cast[w]=a;tmp.push(a);CONTACTS.push(a);});
  if(!o.cutaway)P.a=fa;if(g)g.fa=Math.atan2(P.y-g.y,P.x-g.x);
@@ -889,7 +892,7 @@ function dayNight(){const h=gmin()/60,ss=(a,b,x)=>{const t=clamp((x-a)/(b-a),0,1
  const dt_=(h-6)/14,isDay=dt_>0&&dt_<1,nt=((h+4)%24)/10,u=isDay?dt_:nt,el=Math.sin(u*PI)*(isDay?1.0:0.8),az=u*PI;
  SUNV.set(Math.cos(az)*Math.cos(Math.max(el,0.14)),Math.sin(Math.max(el,0.14)),Math.sin(az)*Math.cos(Math.max(el,0.14))+0.18).normalize();
  const up=Math.sin(el),day=isDay?ss(0.0,0.3,up):0,night=1-(isDay?ss(-0.02,0.16,up):0);NIGHT.value=night;
- if(DN.inset){sun.intensity=0.8;sun.color.copy(DN.c1);DN.k=1;}
+ if(DN.inset){sun.intensity=0.8*(DN.insetK||1);sun.color.copy(DN.c1);DN.k=DN.insetK||1;}
  else{if(isDay){sun.color.copy(DN.c0).lerp(DN.c1,ss(0.08,0.5,up));sun.intensity=2.6*ss(0.0,0.3,up);}else{sun.color.copy(DN.cm);sun.intensity=0.5*ss(0.0,0.25,up);}DN.k=0.3+0.7*(1-night);}
  if(!SKY)mkSky();{const U=SKY.material.uniforms;SKY.position.copy(cam3.position);U.day.value=1-night;U.night.value=night;U.t.value=time;U.k.value=DN.k;if(isDay){U.sunD.value.copy(SUNV);U.moonD.value.set(-SUNV.x,-0.3,-SUNV.z).normalize();}else{U.moonD.value.copy(SUNV);U.sunD.value.set(-SUNV.x,-0.25,-SUNV.z).normalize();}if(scene.background&&scene.background.isTexture)scene.background=null;}
 if(scene.fog){const gold=isDay?(1-ss(0.1,0.45,up))*(1-night):0;scene.fog.color.copy(DN.f0).lerp(DN.f2,gold*0.55).lerp(DN.f1,night);}

@@ -105,7 +105,13 @@ All from Sketchfab under CC BY 4.0, modified for the game (re-based, scaled, tex
 
 Shadows use a 4096 map on desktop, and window glass on the building materials picks up sun glints.
 
-## Opening chapters and voices
+## Story: act one
+
+The story now opens with LAST CALL, replacing the two earlier opening chapters. It starts with a bar scene (Danny, Sam and Olsen) inside a new interior set, `models/set_bar.glb` (`tools/build_bar.py`), moves to Pruitt's office mid-mission (a `scene` step can now name a `set`), and ends on a phone call. The later chapters are unchanged for now.
+
+Lines in `data/story.json` can carry `d`, an acted version of the line with delivery tags and emphasis. `tools/voices_synth.py` sends `d` to ElevenLabs' `eleven_v4` model and keeps `t` for the subtitle. Every new recording was transcribed back and compared with the script.
+
+## Earlier opening chapters and voices
 
 Two chapters now open the story: WELCOME BACK (the booted car and the walk to Pruitt's office) and 90 MINUTES (towing cars the moment their meters expire). Chapter data is in `data/story.json`; their lines are in `data/vo_w1.json` and `data/vo_w2.json`.
 
