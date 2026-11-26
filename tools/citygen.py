@@ -34,6 +34,7 @@ FAC = {
     'f_brick_red': (80, 66, 2, 2, 24, False), 'f_brick_buff': (80, 66, 3, 2, 13, False), 'f_brick_dark': (80, 64, 2, 2, 13, False),
     'f_concrete': (80, 70, 2, 2, 6, False), 'f_glass': (60, 72, 4, 2, 0, False), 'f_panel': (80, 62, 2, 2, 5, False),
     'f_stucco': (80, 64, 2, 2, 25, False), 'f_siding': (46, 30, 1, 1, 30, False), 'f_garage': (80, 30, 1, 1, 0, False),
+    'f_sheath': (80, 66, 2, 2, 6, False),
     'f_metal': (64, 64, 1, 1, 0, True), 'f_cmu': (64, 64, 1, 1, 0, True), 'f_lap': (32, 32, 1, 1, 0, True),
 }
 ROOF = {'r_membrane': 64, 'r_gravel': 64, 'r_shingle': 64, 'r_seam': 64, 'r_parking': 0, 'r_dome': 0}
@@ -221,7 +222,7 @@ named('Everett Station', wall='f_brick_red', tint=(0.82, 0.78, 0.78), shop=None,
 named('Snohomish County Courthouse', wall='f_concrete', tint=(0.9, 0.9, 0.9), shop=None, roof='r_gravel', rtint=WHITE)
 i = nearest('Snohomish County Courthouse', maxd=1500, tallest=True)
 if i is not None and i not in OVR:
-    ovr(i, wall='f_glass', tint=(0.85, 0.95, 1.0), shop=None, roof='r_membrane', rtint=(0.75, 0.76, 0.78), names=['County administration tower'])
+    ovr(i, wall='f_glass', tint=lin('#3a4048'), shop=None, roof='r_membrane', rtint=(0.9, 0.9, 0.9), names=['County administration tower'])  # near-black glass in the flyover
 named('City Hall', wall='f_brick_buff', tint=WHITE, shop=None, roof='r_gravel', rtint=WHITE)
 named('Federal Building', wall='f_concrete', tint=(1, 0.97, 0.9), shop=None, roof='r_gravel', rtint=WHITE)
 named('Everett Police HQ', wall='f_brick_red', tint=(0.9, 0.86, 0.86), shop=None, roof='r_membrane', rtint=(0.75, 0.76, 0.78))
@@ -243,6 +244,67 @@ for nm in ('Commerce Building', 'Port Gardner Building', 'Bank of Everett (Cope 
     named(nm, wall='f_brick_buff', tint=WHITE, shop='shop_buff', roof='r_gravel', rtint=(0.8, 0.8, 0.8))
 for nm in ('Everett High School', 'North Middle School', 'Garfield Elementary School', 'Jackson Elementary School', 'Immaculate Conception School', 'Sequoia High School', 'Everett Christian School'):
     named(nm, wall='f_brick_red', tint=(1.0, 0.93, 0.86), shop=None, roof='r_membrane', rtint=(0.8, 0.8, 0.8), maxd=900)
+
+# ---------- block-by-block looks (tools/blocks.py) ----------
+import os
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+import blocks
+FLH = 33.0
+
+
+def blk(d):
+    d = dict(d)
+    for k in ('tint', 'rtint', 'awn'):
+        if isinstance(d.get(k), str):
+            d[k] = lin(d[k])
+    if d.get('stripe'):
+        d['stripe'] = (lin(d['stripe'][0]),) + tuple(d['stripe'][1:])
+    if d.get('special') == 'construction':
+        d.update(wall='f_sheath', tint=WHITE, shop=None, roof='plain', rtint=lin('#b89a62'), units=False, pitched=False)
+    d.setdefault('pitched', False)
+    return d
+
+
+def clip_y(px, py, ya, yb):
+    # keep the part of a polygon between two east-west lines
+    P = list(zip(px, py))
+    for sgn, lim in ((1, ya), (-1, yb)):
+        Q = []
+        for k in range(len(P)):
+            a, b = P[k], P[(k + 1) % len(P)]
+            ia, ib = sgn * (a[1] - lim) >= 0, sgn * (b[1] - lim) >= 0
+            if ia:
+                Q.append(a)
+            if ia != ib:
+                t = (lim - a[1]) / (b[1] - a[1])
+                Q.append((a[0] + (b[0] - a[0]) * t, lim))
+        P = Q
+    return P
+
+
+for i, parts in blocks.SPLIT.items():
+    b = BLD[i]
+    n = (len(b) - 3) // 2
+    px = [b[3 + k * 2] for k in range(n)]
+    py = [b[4 + k * 2] for k in range(n)]
+    y0, y1 = min(py), max(py)
+    for q, (f0, f1, d) in enumerate(parts):
+        P = clip_y(px, py, y0 + (y1 - y0) * f0, y0 + (y1 - y0) * f1)
+        if len(P) < 3:
+            continue
+        nb = [b[0], b[1], b[2]] + [v for p in P for v in p]
+        if q == 0:
+            BLD[i] = nb
+            j = i
+        else:
+            BLD.append(nb)
+            j = len(BLD) - 1
+            INFO.append(None)
+        qx, qy = [p[0] for p in P], [p[1] for p in P]
+        INFO[j] = (sum(qx) / len(P), sum(qy) / len(P), abs(area2(qx, qy)) / 2)
+        OVR[j] = dict(blk(d), names=OVR.get(j, {}).get('names', []))
+for i, d in blocks.B.items():
+    ovr(i, **blk(d))
 
 CORE = lambda x, y: 12500 < x < 20500 and 9500 < y < 15500
 
@@ -308,8 +370,10 @@ for i, b in enumerate(BLD):
     es = [Hat(px[k], py[k]) for k in range(n)]
     lo, hi = min(es), max(es)
     gm = (lo + hi) / 2
-    base, top = lo - 4, gm + h
     L = look(i)
+    if L.get('fl'):
+        h = L['fl'] * FLH + (10 if L.get('special') != 'construction' else 0)
+    base, top = lo - 4, gm + h
     r = random.Random(i * 104729 + 7)
     stats[L['wall']] = stats.get(L['wall'], 0) + 1
     plain = BF.get(cx, cy, 'plain')
@@ -359,7 +423,8 @@ for i, b in enumerate(BLD):
     wt = max(base + 24, top - rise) if pitched else top
     flat = not pitched
     par = 0
-    if flat and kind != 4 and h > 45 and L['roof'] != 'r_parking':
+    build = L.get('special') == 'construction'
+    if flat and kind != 4 and h > 45 and L['roof'] != 'r_parking' and not build:
         par = 7 if h < 120 else 10
     if L['roof'] == 'r_parking':
         par = 11
@@ -392,7 +457,28 @@ for i, b in enumerate(BLD):
                 BF.quad(SB, (a[0], z0, a[1]), (c[0], z0, c[1]), (c[0], z0 + sh, c[1]), (a[0], z0 + sh, a[1]), (0, 0, ns, 1), WHITE)
             z0 += sh
         ua, ub, vs = wall_uv(wm, ln, max(hh, 8))
-        BF.quad(WB, (a[0], z0, a[1]), (c[0], z0, c[1]), (c[0], rt, c[1]), (a[0], rt, a[1]), (ua, 0.0, ub, (rt - z0) * vs), tint)
+        st = L.get('stripe')
+        nseg = max(1, round(ln / st[1])) if st and ln > st[1] * 0.75 else 1
+        for q in range(nseg):
+            t0, t1 = q / nseg, (q + 1) / nseg
+            sa_, sc_ = (a[0] + (c[0] - a[0]) * t0, a[1] + (c[1] - a[1]) * t0), (a[0] + (c[0] - a[0]) * t1, a[1] + (c[1] - a[1]) * t1)
+            BF.quad(WB, (sa_[0], z0, sa_[1]), (sc_[0], z0, sc_[1]), (sc_[0], rt, sc_[1]), (sa_[0], rt, sa_[1]),
+                    (ua + (ub - ua) * t0, 0.0, ua + (ub - ua) * t1, (rt - z0) * vs), st[0] if st and (q + k) % (st[2] if len(st) > 2 else 2) == (st[2] if len(st) > 2 else 2) - 1 else tint)
+        onx, ony = (py[j] - py[k]) / ln, -(px[j] - px[k]) / ln
+        if L.get('awn') and sh and ln > 60:
+            na = max(1, round(ln / 80))
+            for q in range(na):
+                t0, t1 = (q + 0.12) / na, (q + 0.88) / na
+                p0, p1 = (a[0] + (c[0] - a[0]) * t0, a[1] + (c[1] - a[1]) * t0), (a[0] + (c[0] - a[0]) * t1, a[1] + (c[1] - a[1]) * t1)
+                zt, zb, out = gm + sh - 3, gm + sh - 12, 13
+                BF.quad(plain, (p0[0] + onx * out, zb, p0[1] + ony * out), (p1[0] + onx * out, zb, p1[1] + ony * out), (p1[0], zt, p1[1]), (p0[0], zt, p0[1]), (0, 0, 1, 1), L['awn'])
+                BF.quad(plain, (p0[0] + onx * out, zb - 3, p0[1] + ony * out), (p1[0] + onx * out, zb - 3, p1[1] + ony * out), (p1[0] + onx * out, zb, p1[1] + ony * out), (p0[0] + onx * out, zb, p0[1] + ony * out), (0, 0, 1, 1), tuple(v * 0.75 for v in L['awn']))
+        if build and ln > 30:
+            # open framing above the top plate and a scaffold run along the wall
+            for q in range(max(2, round(ln / 40)) + 1):
+                t = q / max(2, round(ln / 40))
+                BF.box(plain, a[0] + (c[0] - a[0]) * t, rt, a[1] + (c[1] - a[1]) * t, 1.6, 24, 1.6, lin('#c9a66b'))
+            BF.quad(plain, (a[0], rt + 23, a[1]), (c[0], rt + 23, c[1]), (c[0], rt + 25, c[1]), (a[0], rt + 25, a[1]), (0, 0, 1, 1), lin('#c9a66b'))
         if par:
             pc = tuple(v * 0.6 for v in lin('#c9c7c1'))
             BF.quad(plain, (a[0], rt, a[1]), (c[0], rt, c[1]), (c[0], wt, c[1]), (a[0], wt, a[1]), (0, 0, 1, 1), pc)
@@ -469,6 +555,62 @@ for i, b in enumerate(BLD):
                         e = math.atan2(py[1] - py[0], px[1] - px[0])
                         BF.box(plain, x, rt, y, 60, 30, 45, tuple(v * 0.8 for v in lin('#b6b3ab')), e)
                         break
+
+# ---------- cleared lots, street trees and site machines (tools/blocks.py) ----------
+NODES, EDGES, NAMES = W['nodes'], W['edges'], W['names']
+
+
+def crossing(sa, sb):
+    na = set(v for e in EDGES if NAMES[e[4]] == sa for v in e[:2])
+    nb = set(v for e in EDGES if NAMES[e[4]] == sb for v in e[:2])
+    c = na & nb
+    if c:
+        q = sorted(c)[0]
+        return NODES[q][0], NODES[q][1]
+    d, x, y = min((math.hypot(NODES[i][0] - NODES[j][0], NODES[i][1] - NODES[j][1]), (NODES[i][0] + NODES[j][0]) / 2, (NODES[i][1] + NODES[j][1]) / 2) for i in na for j in nb)
+    return x, y
+
+
+EXTRA = {'trees': [], 'props': [], 'clear': [list(t['box']) for t in blocks.SITES]}
+for st, ca, cb, side, cnt, size in blocks.TREES:
+    (ax, ay), (bx, by) = crossing(st, ca), crossing(st, cb)
+    wd = max(e[3] for e in EDGES if NAMES[e[4]] == st)
+    ln = math.hypot(bx - ax, by - ay)
+    nx, ny = (by - ay) / ln, -(bx - ax) / ln
+    want = {'N': (0, -1), 'S': (0, 1), 'E': (1, 0), 'W': (-1, 0)}[side]
+    if nx * want[0] + ny * want[1] < 0:
+        nx, ny = -nx, -ny
+    off = wd / 2 + 16
+    rr = random.Random(hash((st, ca, cb, side)) & 0xffff)
+    for q in range(cnt):
+        t = 0.14 + 0.72 * (q + 0.5) / cnt
+        EXTRA['trees'].append([round(ax + (bx - ax) * t + nx * off), round(ay + (by - ay) * t + ny * off), round(size * rr.uniform(0.88, 1.12), 2)])
+for site in blocks.SITES:
+    x0, y0, x1, y1 = site['box']
+    rr = random.Random(int(x0 + y0))
+    dirt = lin('#8c7656')
+    PB = BF.get((x0 + x1) / 2, (y0 + y1) / 2, 'plain')
+    nx_, ny_ = max(1, round((x1 - x0) / 40)), max(1, round((y1 - y0) / 40))
+    gx = [x0 + (x1 - x0) * k / nx_ for k in range(nx_ + 1)]
+    gy = [y0 + (y1 - y0) * k / ny_ for k in range(ny_ + 1)]
+    for iy in range(ny_):
+        for ix in range(nx_):
+            sh_ = rr.uniform(0.95, 1.04)
+            c4 = [(gx[ix], gy[iy]), (gx[ix + 1], gy[iy]), (gx[ix + 1], gy[iy + 1]), (gx[ix], gy[iy + 1])]
+            BF.quad(PB, *[(x, Hat(x, y) + 1.4, y) for x, y in c4[::-1]], (0, 0, 1, 1), tuple(v * sh_ for v in dirt))
+    if site.get('fence'):
+        fc = lin(site['fence'])
+        per = [(x0, y0), (x1, y0), (x1, y1), (x0, y1)]
+        for k in range(4):
+            (ax, ay), (bx, by) = per[k], per[(k + 1) % 4]
+            m = max(1, round(math.hypot(bx - ax, by - ay) / 36))
+            for q in range(m):
+                mx, my = ax + (bx - ax) * (q + 0.5) / m, ay + (by - ay) * (q + 0.5) / m
+                BF.box(PB, mx, Hat(mx, my) + 1, my, math.hypot(bx - ax, by - ay) / m - 3, 11, 1.2, fc, math.atan2(by - ay, bx - ax))
+    for nm, x, y, ang, sc in site.get('props', []):
+        EXTRA['props'].append([nm, x, y, ang, sc])
+json.dump(EXTRA, open(REPO + '/data/extras.json', 'w'), separators=(',', ':'))
+print('extras', len(EXTRA['trees']), 'trees', len(EXTRA['props']), 'props')
 
 # ---------- write GLB ----------
 mats = sorted(set(k[2] for k in BF.b))

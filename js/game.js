@@ -30,10 +30,11 @@ function streetAt(x,y){const cx=Math.floor(x/600),cy=Math.floor(y/600);let bn=nu
 function xnode(n1,n2){for(let i=0;i<nodes.length;i++){const s=new Set(nodes[i].nb.map(k=>edges.get(i*65536+k).name));if(s.has(n1)&&s.has(n2))return i;}return -1;}
 async function loadImg(src){const im=new Image();im.src=src;await im.decode();return im;}
 function pixels(im){const c=document.createElement('canvas');c.width=im.naturalWidth;c.height=im.naturalHeight;const x=c.getContext('2d',{willReadFrequently:true});x.drawImage(im,0,0);return x.getImageData(0,0,c.width,c.height).data;}
-let CITY=null,DBGC=null;const PROPS={},SETS={};
+let CITY=null,DBGC=null,EXTRA={trees:[],props:[]};const PROPS={},SETS={};
 async function loadWorld(){
  WORLD=await (await fetch('data/world.json')).json();try{CITY=(await new GLTFLoader().loadAsync('data/city.glb')).scene;}catch(e){console.warn('city model unavailable, using generated buildings',e);CITY=null;}
- await Promise.all(['lamp','signal','busstop','tree','pine','hydrant','bench','trash'].map(async k=>{try{PROPS[k]=(await new GLTFLoader().loadAsync('models/p_'+k+'.glb')).scene;}catch(e){console.warn('prop missing',k);}}));
+ try{EXTRA=Object.assign(EXTRA,await (await fetch('data/extras.json')).json());}catch(e){}
+ await Promise.all(['lamp','signal','busstop','tree','pine','hydrant','bench','trash','excavator'].map(async k=>{try{PROPS[k]=(await new GLTFLoader().loadAsync('models/p_'+k+'.glb')).scene;}catch(e){console.warn('prop missing',k);}}));
  for(const k of ['office','chamber'])try{const g=(await new GLTFLoader().loadAsync('models/set_'+k+'.glb')).scene;g.visible=false;g.traverse(o=>{if(o.isMesh){o.castShadow=false;o.receiveShadow=/^floor|^shell/.test(o.name);}});const a=new THREE.PointLight(0xffe2bd,1.5,0,0);a.position.set(0,30,0);const b=new THREE.PointLight(0xdcebff,0.8,0,0);b.position.set(-30,24,-40);g.add(a,b);SETS[k]=g;}catch(e){console.warn('set missing',k);}MW=WORLD.mw;MH=WORLD.mh;WW=MW*T;WH=MH*T;
  const md=pixels(await loadImg('data/map.png'));map=new Uint8Array(MW*MH);for(let i=0;i<MW*MH;i++)map[i]=Math.round(md[i*4]/30);
  const hd=pixels(await loadImg('data/hm.png'));gw=WORLD.gw;gh=WORLD.gh;GS=WORLD.gs*10;HMAP=new Float32Array(gw*gh);for(let i=0;i<gw*gh;i++)HMAP[i]=((hd[i*4]<<8)|hd[i*4+1])-1000;
@@ -615,8 +616,11 @@ function buildStatic2(){
  const M4=()=>new THREE.Matrix4(),Q=new THREE.Quaternion(),UP=new THREE.Vector3(0,1,0),tb=B_(),gc=hex('#2f5a34'),tc=hex('#4a3526');
  cube(tb,0,12,0,4,24,4,tc);for(let k=0;k<3;k++){const y0=18+k*24,ss=26*(1-k*0.27),tp=[0,k===2?110:y0+46,0],c4=[[-ss,y0,-ss],[-ss,y0,ss],[ss,y0,ss],[ss,y0,-ss]];for(let q=0;q<4;q++)tri(tb,c4[q],c4[(q+1)%4],tp,mul(gc,(q%2?1:0.82)*(1-k*0.05)));}
  const tm=[];for(let y=3;y<MH;y+=6)for(let x=3;x<MW;x+=6){const t=map[I(x,y)],p=h2(x,y);if(!((t===PARK&&p<0.42)||(t===GRASS&&p<0.035)))continue;if(tile(x+3,y)===BLDG||tile(x-3,y)===BLDG||tile(x,y+3)===BLDG||tile(x,y-3)===BLDG||tile(x+3,y)===ROAD||tile(x-3,y)===ROAD)continue;
-  const wx=(x+h2(x,y+1)*4-2)*T,wy=(y+h2(x+1,y)*4-2)*T,s=0.75+h2(y,x)*0.8;Q.setFromAxisAngle(UP,p*40);tm.push(M4().compose(new THREE.Vector3(wx,Hat(wx,wy),wy),Q,new THREE.Vector3(s,s*(0.9+p),s)));}
- if(tm.length){if(PROPS.tree&&PROPS.pine){const ta=[],tp=[];tm.forEach((m,i)=>((i*7)%10<6?ta:tp).push(m));instGLB(PROPS.tree,ta,true);instGLB(PROPS.pine,tp,true);}else inst(geoOf(tb),S({}),tm,true);}
+  const wx=(x+h2(x,y+1)*4-2)*T,wy=(y+h2(x+1,y)*4-2)*T,s=0.75+h2(y,x)*0.8;if((EXTRA.clear||[]).some(b=>wx>b[0]-40&&wx<b[2]+40&&wy>b[1]-40&&wy<b[3]+40))continue;Q.setFromAxisAngle(UP,p*40);tm.push(M4().compose(new THREE.Vector3(wx,Hat(wx,wy),wy),Q,new THREE.Vector3(s,s*(0.9+p),s)));}
+ // street trees and site machines placed block by block (data/extras.json, from tools/blocks.py)
+ const st=[];for(const t of EXTRA.trees||[]){Q.setFromAxisAngle(UP,(t[0]*0.37+t[1]*0.11)%6.28);st.push(M4().compose(new THREE.Vector3(t[0],Hat(t[0],t[1]),t[1]),Q,new THREE.Vector3(t[2],t[2],t[2])));}
+ if(tm.length||st.length){if(PROPS.tree&&PROPS.pine){const ta=st.slice(),tp=[];tm.forEach((m,i)=>((i*7)%10<6?ta:tp).push(m));instGLB(PROPS.tree,ta,true);instGLB(PROPS.pine,tp,true);}else inst(geoOf(tb),S({}),tm.concat(st),true);}
+ {const by={};for(const p of EXTRA.props||[]){Q.setFromAxisAngle(UP,-p[3]);(by[p[0]]=by[p[0]]||[]).push(M4().compose(new THREE.Vector3(p[1],Hat(p[1],p[2]),p[2]),Q,new THREE.Vector3(p[4],p[4],p[4])));}for(const k in by)if(PROPS[k])instGLB(PROPS[k],by[k],true);}
  // street lamps, signals, bus stops along the real street network
  const lb=B_(),pc=[0.2,0.22,0.23];cube(lb,0,37,0,1.8,74,1.8,pc);cube(lb,11,73,0,22,1.6,1.6,pc);cube(lb,21,72,0,8,2,4,[0.9,0.88,0.8]);
  const lmx=[],sgx=[],nsx=[],ewx=[],hyx=[],seen=new Set();let hk=0;

@@ -130,3 +130,21 @@ The player, the nine story characters, the police officer and four pedestrians a
 Mouths are driven by the voice audio: each line's loudness is measured 30 times a second and sets how far the speaker's mouth opens, so it opens on words and closes in pauses and when the line ends. A line with no audio falls back to a generic talking motion.
 
 Only the player, the officer and the four pedestrians load at start. A story character's model loads when its chapter becomes current or when the character is first on screen; a pedestrian stands in for the moment until it arrives.
+
+## Block by block
+
+Downtown is being matched to the owner's flyover recording one block at a time. The recording is reference only (which building stands where, storeys, colours, roofs, trees, cleared lots); nothing is copied from it. `tools/blocks.py` holds the per-building looks, keyed by footprint index, and `tools/blockmap.py` draws an indexed footprint map of any area to work from. `tools/citygen.py` applies them and also writes `data/extras.json` (street trees, site machines, lots that scattered trees keep out of), which the game reads.
+
+Done so far:
+
+| Blocks | What was set |
+|---|---|
+| Pacific Ave, north side, Grand to Rucker | Four-storey apartment row with alternating blue and white fronts, street trees |
+| Pacific Ave, south side, Grand to Rucker | Fenced, graded dirt lot with two excavators |
+| Rucker Ave, west side, Pacific to Wall | One footprint split into the blue-doored garage, the brick shop and the building under construction (sheathed walls, open framing); two-storey white and charcoal buildings north of it; street trees both sides |
+| Rucker and Pacific, north-east corner | Tan two-storey building |
+| Grand Ave, California to Hewitt | Brick market building, white and orange six-storey apartments at Hewitt, grey and teal five-storey block, long white single-storey building opposite, street trees |
+| County campus | Administration tower changed to near-black glass |
+
+The excavator is a Meshy-generated model packed by `tools/prop_meshy.py`. The recording is 220 px wide, so signs and window detail cannot be read from it; storeys, colours and massing can.
+
