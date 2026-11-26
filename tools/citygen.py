@@ -349,6 +349,10 @@ def _texmean(name):
 
 
 TEXM = {k: _texmean(k) for k in ('r_membrane', 'r_gravel', 'r_shingle', 'r_seam')}
+# every house roof as read from the aerial (tools/houses.py)
+HOUSES = {}
+if os.path.exists(REPO + '/data/dossier/houses.json'):
+    HOUSES = {int(k): v for k, v in json.load(open(REPO + '/data/dossier/houses.json'))['houses'].items()}
 
 
 def look(i):
@@ -473,6 +477,8 @@ for i, b in enumerate(BLD):
     pitched = L['pitched']
     rise = 0
     RA = RB = None
+    hz = None
+    gable = False
     if pitched:
         sxx = sum((x - cx) ** 2 for x in px)
         syy = sum((y - cy) ** 2 for y in py)
@@ -483,8 +489,12 @@ for i, b in enumerate(BLD):
         vs_ = [-(px[k] - cx) * ay + (py[k] - cy) * ax for k in range(n)]
         u0, u1, v0, v1 = min(us), max(us), min(vs_), max(vs_)
         lng = (u1 - u0) >= (v1 - v0)
+        hz = HOUSES.get(i) if (kind in (0, 3) and i not in OVR) else None
+        if hz and hz.get('ax'):
+            lng = not lng            # the aerial shows the ridge running across the short side
         le, se = (u1 - u0, v1 - v0) if lng else (v1 - v0, u1 - u0)
-        hl = max(0, (le - se) / 2)
+        gable = bool(hz) and not hz.get('hip')
+        hl = le / 2 if gable else max(0, (le - se) / 2)
         uc, vc = (u0 + u1) / 2, (v0 + v1) / 2
         mx, my = cx + uc * ax - vc * ay, cy + uc * ay + vc * ax
         dx, dy = (ax, ay) if lng else (-ay, ax)
@@ -586,6 +596,44 @@ for i, b in enumerate(BLD):
             BF.tri(plain, [(tx + dx_ * 25, z0s, ty + dy_ * 25), (tx + ex * 25, z0s, ty + ey * 25), (tx, z1s, ty)], [(0, 0), (1, 0), (0.5, 1)], tuple(v * (0.8 if q % 2 else 1.0) for v in sc_))
     RBf = BF.get(cx, cy, L['roof'])
     rc = L['rtint']
+    if hz and hz.get('rc') and L['roof'] == 'r_shingle':
+        hc = '#74777a' if hz['rc'] == '#4d5a4c' else hz['rc']          # a green reading is moss or canopy over a grey roof
+        rc = tuple(min(1.0, lin(hc)[q] / TEXM['r_shingle'][q]) for q in range(3))
+    if hz and kind == 0 and hz.get('fa') is not None and h > 50:
+        # front door on the street side; a porch on houses from before about 1950 (era from the county sales layer, see tools/houses.py)
+        fx, fy = math.cos(hz['fa']), math.sin(hz['fa'])
+        kb, sb = None, 0
+        for k in range(n):
+            j = (k + 1) % n
+            ln = math.hypot(px[j] - px[k], py[j] - py[k])
+            if ln < 45:
+                continue
+            sc_ = ((py[j] - py[k]) / ln * fx - (px[j] - px[k]) / ln * fy) * min(ln, 120)
+            if sc_ > sb:
+                kb, sb = k, sc_
+        if kb is not None:
+            k, j = kb, (kb + 1) % n
+            ln = math.hypot(px[j] - px[k], py[j] - py[k])
+            ex, ey = (px[j] - px[k]) / ln, (py[j] - py[k]) / ln
+            ox_, oy_ = ey, -ex
+            f_ = 0.5 + ((i * 13) % 5 - 2) * 0.09
+            mx_, my_ = px[k] + (px[j] - px[k]) * f_, py[k] + (py[j] - py[k]) * f_
+            ang = math.atan2(ey, ex)
+            dr_ = lin(['#5a2f28', '#2f3f52', '#e6e2d6', '#3a3d42', '#6b4a2e'][i % 5])
+            d0, d1 = (mx_ - ex * 4.5 + ox_ * 0.5, my_ - ey * 4.5 + oy_ * 0.5), (mx_ + ex * 4.5 + ox_ * 0.5, my_ + ey * 4.5 + oy_ * 0.5)
+            fl_ = gm + 5
+            BF.quad(plain, (d0[0], fl_, d0[1]), (d1[0], fl_, d1[1]), (d1[0], fl_ + 20.5, d1[1]), (d0[0], fl_ + 20.5, d0[1]), (0, 0, 1, 1), dr_)
+            trim = lin('#efece4')
+            if hz.get('yr', 9999) < 1950 and ln > 55:
+                pw = min(ln * 0.62, 70.0)
+                pxc, pyc = mx_ + ox_ * 9.5, my_ + oy_ * 9.5
+                BF.box(plain, pxc, base, pyc, pw, fl_ - base, 19, lin('#9a968c'), ang)
+                for s_ in (-1, 1):
+                    BF.box(plain, pxc + ex * s_ * (pw / 2 - 1.5) + ox_ * 8, fl_, pyc + ey * s_ * (pw / 2 - 1.5) + oy_ * 8, 1.6, 21, 1.6, trim, ang)
+                BF.box(plain, pxc + ox_ * 1.0, fl_ + 21, pyc + oy_ * 1.0, pw + 5, 2.2, 23, tuple(v * 0.8 for v in rc), ang)
+                BF.box(plain, mx_ + ox_ * 22, base, my_ + oy_ * 22, 13, max(1.0, (fl_ - base) * 0.5), 7, lin('#b9b6ac'), ang)
+            else:
+                BF.box(plain, mx_ + ox_ * 4, base, my_ + oy_ * 4, 13, fl_ - base, 8, lin('#b9b6ac'), ang)
     if pitched:
         S = 64.0
         E = [(RA[0], wt + rise, RA[1]), (RB[0], wt + rise, RB[1])]
@@ -600,6 +648,11 @@ for i, b in enumerate(BLD):
             j = (k + 1) % n
             vi, vj = (px[k], wt, py[k]), (px[j], wt, py[j])
             a_, b_ = ne(px[k], py[k]), ne(px[j], py[j])
+            if a_ == b_ and gable and abs((px[j] - px[k]) * dx + (py[j] - py[k]) * dy) < 0.5 * math.hypot(px[j] - px[k], py[j] - py[k]):
+                # gable end: the wall carries on up to the ridge in siding
+                gl = math.hypot(px[j] - px[k], py[j] - py[k])
+                BF.tri(WB, [vi, vj, E[a_]], [(-0.3, 0.0), (0.3, 0.0), (0.0, rise / 30.0)] if wm in ('f_siding', 'f_lap') else [(0.0, 0.0), (gl / 64.0, 0.0), (gl / 128.0, rise / 64.0)], tuple(v * 0.94 for v in tint))
+                continue
             if a_ == b_:
                 T = [(vi, vj, E[a_])]
             else:

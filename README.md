@@ -268,3 +268,21 @@ Wetmore is done end to end (23rd St to 37th St) from five dossiers (`wetmore_n`,
 - Parking is as painted in the county aerial (`PARKING` in `tools/blocks.py`): 45 degree stalls on the east side from 26th St to Hewitt and on the west side from Hewitt to Pacific, parallel on the other side, with the centre line and the traffic lanes moved off-centre to match.
 - Public and listed buildings take their materials from written references: the National Register forms for the 1929 City Hall (3002) and the 1921 Knights of Columbus building (1611 Everett Ave), the Everett Register nomination for the Bank of Everett of 1963 (2730), Historic Everett's walking tour for the Port Gardner Building (2802), and the Hewitt district nomination for the IOOF Hall (2813).
 - Not verified: 2721 Wetmore is newer than the LiDAR survey, so its 44 ft is estimated from its shadow. Wall materials of the unlisted buildings are inferred. The Performing Arts Center, Municipal Building and Municipal Court have no written description of their walls in these sources.
+
+### Houses
+
+`tools/houses.py` reads every house and outbuilding roof (4,966 footprints) from the county 2024 aerial into `data/dossier/houses.json`, and `tools/citygen.py` builds the houses from it:
+
+| Read | How | Result |
+|---|---|---|
+| Shingle colour | Median roof pixel with tree canopy left out, matched to nine roofing colours | Mostly grey, 935 dark grey, 743 light grey, 359 brown |
+| Ridge direction | The two roof planes differ in brightness across the ridge | 1,078 ridges run across the short side |
+| Gable or hip | On a hip the planes' difference fades at the ends of the ridge | 2,993 gables and 731 hips read; 1,242 unclear and given a default |
+| Street side | Nearest street | Front door there |
+| Era | County recent-sales layer: exact year for 297 houses, nearest sold house within 150 m for 3,243 | A front porch on houses from before about 1950 |
+
+Gable ends are sided up to the ridge. Heights are the LiDAR ones from the whole-map pass.
+
+`tools/trees.py` now also sets the ground from the leaf-on imagery: grass where it shows vegetation, paved or bare ground where it does not, so lawns, driveways and car parks sit where the real ones are.
+
+Not from data: siding colours (an aerial cannot see walls), window layout, the porch design, and the era of the 3,243 houses that takes its year from a neighbour.

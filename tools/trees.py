@@ -142,7 +142,31 @@ def detect():
     print('vegetation px', int(veg.sum()), 'tree px', int(T.sum()), 'crowns', len(out), 'evergreen', sum(t[3] for t in out), 'outside canopy layer (over pavement)', sum(1 for t in out if not t[4]))
 
 
+def lawns():
+    """Ground cover from the leaf-on imagery: grass where NAIP shows vegetation, paved or bare ground where it does not.
+    Rewrites the green channel of data/mask.png (1 px = 1 m) away from the streets; tools/citygen.py resets it on every build."""
+    from scipy.ndimage import maximum_filter
+    A, e0, n1 = naip()
+    mk = np.asarray(Image.open(ROOT + '/data/mask.png').convert('RGB')).copy()
+    H, Wd = mk.shape[:2]
+    wx = (np.arange(Wd, dtype=np.float32) + 0.5) * 10; wy = (np.arange(H, dtype=np.float32) + 0.5) * 10
+    X, Y = np.meshgrid(wx, wy)
+    e = D.A[0][0] * X + D.A[0][1] * Y + D.A[0][2]; n = D.A[1][0] * X + D.A[1][1] * Y + D.A[1][2]
+    ix = np.clip(((e - e0) / 2).astype(int), 0, A.shape[1] - 1); iy = np.clip(((n1 - n) / 2).astype(int), 0, A.shape[0] - 1)
+    nir, red = A[..., 3].astype(np.float32), A[..., 0].astype(np.float32)
+    veg = maximum_filter(((nir - red) / (nir + red + 1) > 0.17), size=3)[iy, ix]
+    road = mk[..., 0] > 90
+    far = edt(~road) > 2.5                       # leave kerbs, planting strips and walks as the street builder drew them
+    G = mk[..., 1]
+    park = G > 200
+    G[far & veg & ~park] = 0
+    G[far & ~veg & (G < 100)] = 128
+    Image.fromarray(mk).save(ROOT + '/data/mask.png', optimize=True)
+    print('ground: grass %.0f%%, paved or bare %.0f%% of the land away from streets' % (100 * (far & veg).sum() / far.sum(), 100 * (far & ~veg).sum() / far.sum()))
+
+
 def main():
+    lawns()
     raw = json.load(open(ROOT + '/data/dossier/trees_raw.json'))['trees']
     gm = np.asarray(Image.open(ROOT + '/data/mask.png').convert('RGB'))
     extras = json.load(open(ROOT + '/data/extras.json'))
