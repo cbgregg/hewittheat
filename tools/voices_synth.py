@@ -17,17 +17,17 @@ have={k:p for p,d in packs.items() for k in d}
 miss=[k for k in lines if k not in have and lines[k][0] not in ('w1','w2')]
 extra=[k for k in have if k not in lines]
 print('lines',len(lines),'existing keys',len(have),'unmatched story lines',miss[:6],'unmatched pack keys',extra[:6])
-os.makedirs('cache',exist_ok=True)
+os.makedirs('cache_hq',exist_ok=True)
 n=chars=0
 for k,(pk,w,t) in lines.items():
     if w not in V: continue
     pk=pk or have.get(k)
     if pk is None: continue
-    d=DIR.get(k);h=hashlib.sha1((V[w]+'|'+t+('|v4|'+d if d else '')).encode()).hexdigest()[:16];cf='cache/%s.mp3'%h
+    d=DIR.get(k);h=hashlib.sha1((V[w]+'|'+t+('|v4|'+d if d else '')).encode()).hexdigest()[:16];cf='cache_hq/%s.mp3'%h
     if not os.path.exists(cf):
         body=json.dumps({'text':d,'model_id':'eleven_v4','voice_settings':{'stability':0.5,'similarity_boost':0.8}} if d else {'text':t,'model_id':'eleven_multilingual_v2','voice_settings':{'stability':0.5,'similarity_boost':0.8,'style':0.15}}).encode()
         try:
-            a=urllib.request.urlopen(urllib.request.Request('https://api.elevenlabs.io/v1/text-to-speech/%s?output_format=mp3_22050_32'%V[w],data=body,headers={'xi-api-key':K,'Content-Type':'application/json'}),timeout=120).read()
+            a=urllib.request.urlopen(urllib.request.Request('https://api.elevenlabs.io/v1/text-to-speech/%s?output_format=mp3_44100_96'%V[w],data=body,headers={'xi-api-key':K,'Content-Type':'application/json'}),timeout=120).read()
         except Exception as e:
             print('FAIL',k,str(e)[:60],(e.read()[:160] if hasattr(e,'read') else ''));continue
         open(cf,'wb').write(a);chars+=len(d or t)

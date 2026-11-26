@@ -2,7 +2,7 @@ import * as THREE from 'three';
 import {GLTFLoader} from 'three/addons/loaders/GLTFLoader.js';
 import {clone as skClone} from 'three/addons/utils/SkeletonUtils.js';
 /* Downtown Everett built from City of Everett GIS data: street centerlines, building footprints, 2 ft contours, parks, bus stops, 2022 aerial imagery. 10 units = 1 m, one tile = 2 m. */
-const PI=Math.PI,T=20,DV='?v=1125h';
+const PI=Math.PI,T=20,DV='?v=1125i';
 let MW=0,MH=0,WW=0,WH=0,map=new Uint8Array(1),HMAP=null,gw=0,gh=0,GS=80,WORLD=null;
 const WATER=0,GRASS=1,ROAD=2,WALK=3,BLDG=4,PARK=5,CONC=6,HOUSE=7;
 const SOL=[1,0,0,0,1,0,0,0];
@@ -257,7 +257,7 @@ let CAST={},PRO=[],EPI=[],RQ=[],rqT=0;const PK={};
 function loadPack(id){if(PK[id]||!AC)return PK[id];return PK[id]=fetch('data/vo_'+id+'.json'+DV).then(r=>r.json()).then(j=>{for(const k in j){const b=atob(j[k]),u=new Uint8Array(b.length);for(let i=0;i<b.length;i++)u[i]=b.charCodeAt(i);AC.decodeAudioData(u.buffer,buf=>{SND[k]=buf;},()=>{});}}).catch(()=>{delete PK[id];});}
 function needPack(){if(MODE!=='story'||!AC)return;if(ST===0)loadPack('c0');if(ST<STORY.length)loadPack(STORY[ST].id);for(let i=0;i<ST-1;i++){const id=STORY[i].id;if(PK[id]){for(const k in SND)if(k.startsWith('v_'+id+'_'))delete SND[k];}}}
 function queueRadio(lines,kp){lines.forEach((l,i)=>RQ.push({k:kp+'_'+i,l}));}
-function radioStep(dt){rqT-=dt;if(!RQ.length||rqT>0)return;const q=RQ.shift(),b=SND['v_'+q.k],d=b?b.duration:Math.max(2.5,q.l.t.length/14);vo(q.k,null,null,1.8);say(((CAST[q.l.w]||{}).n||'').toUpperCase()+': '+q.l.t,d+0.9);rqT=d+0.55;}
+function radioStep(dt){rqT-=dt;if(!RQ.length||rqT>0)return;const q=RQ.shift(),b=SND['v_'+q.k],d=b?b.duration:Math.max(2.5,q.l.t.length/14);vo(q.k,null,null,1.1);say(((CAST[q.l.w]||{}).n||'').toUpperCase()+': '+q.l.t,d+0.9);rqT=d+0.55;}
 const HDT={michelle:14.1,rpm:16.5,cesium:15,soldier:16.6},_hv=new THREE.Vector3();
 function headH(e){const u=e._m&&e._m.userData;if(u&&u.head){u.head.getWorldPosition(_hv);const h=_hv.y-e._m.position.y;if(h>8&&h<24)return h+1.1;}return HDT[e.ch]||16.4;}
 function camOK(f){const q=f(0);return !solidAt(q[0],q[2])&&los(q[0],q[2],q[3],q[5]);}
@@ -301,7 +301,7 @@ function playCut(shots,onEnd){CUT={shots,i:-1,t:0,T:0,onEnd};skipTap=false;docum
 function endCut(){const c=CUT;if(!c)return;stopVo();CUT=null;CAMO=null;document.body.classList.remove('cine');if(c.onEnd)c.onEnd();}
 function nextShot(){const c=CUT;c.i++;if(c.i>=c.shots.length){endCut();return;}const s=c.shots[c.i];c.t=0;c.started=false;c.wait=0;s.dd=s.d||Math.max(2.6,(s.text||'').length/13+1.2);if(s.sfx)sfx(s.sfx);if(s.on)s.on();}
 function cutStep(dt){const c=CUT;if(!c)return;if(skipTap&&c.T>0.7){skipTap=false;if(c.T-(c.tap||-9)<0.45){endCut();return;}c.tap=c.T;stopVo();nextShot();return;}skipTap=false;const s=c.shots[c.i];c.T+=dt;
- if(s.vo&&!c.started){const b=SND['v_'+s.vo];if(b||c.wait>4||!AC||!sndOn){c.started=true;if(b){stopVo();const r=vo(s.vo,null,null,1.8);voSrc=r&&r.stop?r:null;s.dd=b.duration+0.9;}else VOX=null;}else c.wait+=dt;}
+ if(s.vo&&!c.started){const b=SND['v_'+s.vo];if(b||c.wait>4||!AC||!sndOn){c.started=true;if(b){stopVo();const r=vo(s.vo,null,null,1.1);voSrc=r&&r.stop?r:null;s.dd=b.duration+0.9;}else VOX=null;}else c.wait+=dt;}
  c.t+=dt;const alt=s.cam2&&c.t>s.dd*0.52,q=(alt?s.cam2:s.cam)(alt?c.t-s.dd*0.52:c.t),hh=Math.sin(c.T*1.7)*0.12,hv=Math.sin(c.T*2.3+1)*0.09,pk=ease(clamp(c.t/Math.max(s.dd,0.5),0,1))*(s.text?0.075:0.02);q[0]+=(q[3]-q[0])*pk;q[1]+=(q[4]-q[1])*pk;q[2]+=(q[5]-q[2])*pk;q[3]+=hh;q[4]+=hv;CAMO=q;if(c.t>=s.dd&&(c.started||!s.vo))nextShot();}
 function drawCut(){const c=CUT,s=c.shots[c.i],bh=Math.round(H*0.12);g.fillStyle='#000';g.fillRect(0,0,W,bh);g.fillRect(0,H-bh,W,bh);
  const nx=c.shots[c.i+1],fi=(c.i===0||s.fade)?clamp(1-c.t/0.7,0,1):0,fo=(!nx||nx.fade)?clamp(1-(s.dd-c.t)/0.55,0,1):0,a=Math.max(fi,c.started||!s.vo?fo:0);
@@ -516,7 +516,7 @@ function streamSpots(first){let act=0;for(const c of cars)if(c.park)act++;const 
 /* ---------- AUDIO ---------- */
 let AC=null,MG,engO,engO2,engG,sirO,sirG,skG,NB,sndOn=true;
 function initAudio(){if(AC)return;try{AC=new (window.AudioContext||window.webkitAudioContext)();}catch(e){AC=null;return;}
- MG=AC.createGain();MG.gain.value=0.6;MG.connect(AC.destination);
+ MG=AC.createGain();MG.gain.value=0.6;{const lim=AC.createDynamicsCompressor();lim.threshold.value=-9;lim.knee.value=10;lim.ratio.value=8;lim.attack.value=0.004;lim.release.value=0.22;MG.connect(lim);lim.connect(AC.destination);}
  NB=AC.createBuffer(1,AC.sampleRate,AC.sampleRate);const d=NB.getChannelData(0);for(let i=0;i<d.length;i++)d[i]=Math.random()*2-1;
  const lp=AC.createBiquadFilter();lp.type='lowpass';lp.frequency.value=520;engG=AC.createGain();engG.gain.value=0;lp.connect(engG);engG.connect(MG);
  engO=AC.createOscillator();engO.type='sawtooth';engO.frequency.value=50;engO.connect(lp);engO.start();engO2=AC.createOscillator();engO2.type='square';engO2.frequency.value=25;engO2.connect(lp);engO2.start();
@@ -528,7 +528,7 @@ function play(k,vol,x,y,rate){const b=SND[k];if(!b||!AC||!sndOn)return false;let
 let VOX=null;const ENV=new Map();
 function envOf(b){let e=ENV.get(b);if(!e){const d=b.getChannelData(0),n=Math.floor(b.sampleRate/30),m=Math.ceil(d.length/n);e=new Float32Array(m);let mx=1e-4;for(let i=0;i<m;i++){let q=0;const a=i*n,z=Math.min(d.length,a+n);for(let j=a;j<z;j++)q+=d[j]*d[j];e[i]=Math.sqrt(q/(z-a||1));if(e[i]>mx)mx=e[i];}const vc=Array.from(e).filter(v=>v>0.02*mx).sort((p,q)=>p-q),rf=vc.length?vc[Math.floor(vc.length*0.8)]:mx;for(let i=0;i<m;i++)e[i]=Math.pow(clamp((e[i]/rf-0.08)/0.92,0,1),0.7);ENV.set(b,e);}return e;}
 function voxLevel(){if(!VOX||!AC)return -1;const t=(AC.currentTime-VOX.t)*30,e=VOX.e;if(t<0||t>=e.length-1)return 0;const i=t|0;return e[i]+(e[i+1]-e[i])*(t-i);}
-function vo(k,x,y,vol){const b=SND['v_'+k];VOX=b&&AC&&b.getChannelData?{t:AC.currentTime,e:envOf(b)}:null;return play('v_'+k,vol==null?1.5:vol,x,y);}
+function vo(k,x,y,vol){const b=SND['v_'+k];VOX=b&&AC&&b.getChannelData?{t:AC.currentTime,e:envOf(b)}:null;return play('v_'+k,vol==null?1.15:vol,x,y);}
 function loopG(k){if(LP[k])return LP[k];const b=SND[k];if(!b)return null;const s=AC.createBufferSource();s.buffer=b;s.loop=true;s.loopStart=0.04;s.loopEnd=b.duration-0.07;const g=AC.createGain();g.gain.value=0;s.connect(g);g.connect(MG);s.start();return LP[k]=g;}
 const BK={'He has a gun!':'gun','Run!':'run','Call 911!':'911','Get down!':'down','Hey, that is my car!':'mycar','Are you kidding me?!':'kid','Somebody stop him!':'stophim','Bus is late again.':'bus','You waiting on the 7?':'seven','Nice day for it.':'nice','Watch it!':'watch','Hey!':'hey','Excuse you.':'excuse','Easy, man.':'easy','Everett PD! Stop!':'stop','Hands where I can see them!':'hands','Suspect on foot!':'foot'};
 function barkVo(p,t){if(p.who){if(t===p.hi)vo(p.who+'_hi',p.x,p.y,1.6);return;}const k=BK[t];if(!k)return;const w=p.kind==='cop'?(p.vw||(p.vw=Math.random()<0.5?'cop':'cop2')):(p.vw||(p.vw=(p.ch==='michelle'||p.ch==='woman'||/ped_w|marge|dee/.test(p.ch))?pick(['f1','f2']):pick(['m1','m2'])));vo(w+'_'+k,p.x,p.y,1.5);}
@@ -801,7 +801,7 @@ function init3D(){
 function initMarkers(){GV.forEach((gv,i)=>MK['g'+i]=mkMarker(gv.type==='race'?'#ff5ad0':'#ffd23f',gv.type==='courier'?'COURIER':gv.type==='race'?'RACE':'EXPORT'));PKG.forEach(p=>{p.m=box(9,9,9,0,0,0,0,null,bmat('#40e0ff'));p.m.castShadow=false;scene.add(p.m);});
  MK.shop=mkMarker('#ff8a30','BODY SHOP');MK.pawn=mkMarker('#7ad06a','AMMO');MK.hosp=mkMarker('#ff5a6a','HEAL');MK.tgt=mkMarker('#ffe45a','▼');MK.story=mkMarker('#40e0ff','STORY');}
 /* --- optional: Google Photorealistic 3D Tiles. Needs the player's own Map Tiles API key and a normal web host (blocked inside the Claude artifact). --- */
-const BUILD='Nov 25 10:20pm - Streets';
+const BUILD='Nov 25 10:45pm - Audio HQ';
 /* ---------- film pass: HDR scene -> sharpen, glow, tone map, grade, grain ---------- */
 let FX=null;const GTKU={value:1};
 function initFX(){try{const sz=ren.getDrawingBufferSize(new THREE.Vector2()),rt=new THREE.WebGLRenderTarget(sz.x,sz.y,{samples:LOW?0:4,type:THREE.HalfFloatType});rt.depthTexture=new THREE.DepthTexture(sz.x,sz.y);
