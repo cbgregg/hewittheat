@@ -2,7 +2,7 @@ import * as THREE from 'three';
 import {GLTFLoader} from 'three/addons/loaders/GLTFLoader.js';
 import {clone as skClone} from 'three/addons/utils/SkeletonUtils.js';
 /* Downtown Everett built from City of Everett GIS data: street centerlines, building footprints, 2 ft contours, parks, bus stops, 2022 aerial imagery. 10 units = 1 m, one tile = 2 m. */
-const PI=Math.PI,T=20;
+const PI=Math.PI,T=20,DV='?v=1125f';
 let MW=0,MH=0,WW=0,WH=0,map=new Uint8Array(1),HMAP=null,gw=0,gh=0,GS=80,WORLD=null;
 const WATER=0,GRASS=1,ROAD=2,WALK=3,BLDG=4,PARK=5,CONC=6,HOUSE=7;
 const SOL=[1,0,0,0,1,0,0,0];
@@ -32,11 +32,11 @@ async function loadImg(src){const im=new Image();im.src=src;await im.decode();re
 function pixels(im){const c=document.createElement('canvas');c.width=im.naturalWidth;c.height=im.naturalHeight;const x=c.getContext('2d',{willReadFrequently:true});x.drawImage(im,0,0);return x.getImageData(0,0,c.width,c.height).data;}
 let CITY=null,DBGC=null,EXTRA={trees:[],props:[]};const PROPS={},SETS={};
 async function loadWorld(){
- WORLD=await (await fetch('data/world.json')).json();try{CITY=(await new GLTFLoader().loadAsync('data/city.glb')).scene;}catch(e){console.warn('city model unavailable, using generated buildings',e);CITY=null;}
- try{EXTRA=Object.assign(EXTRA,await (await fetch('data/extras.json')).json());}catch(e){}
- await Promise.all(['lamp','signal','busstop','tree','pine','hydrant','bench','trash','excavator'].map(async k=>{try{PROPS[k]=(await new GLTFLoader().loadAsync('models/p_'+k+'.glb')).scene;}catch(e){console.warn('prop missing',k);}}));
- for(const k of ['office','chamber','bar'])try{const g=(await new GLTFLoader().loadAsync('models/set_'+k+'.glb')).scene;g.visible=false;g.traverse(o=>{if(o.isMesh){o.castShadow=false;o.receiveShadow=/^floor|^shell/.test(o.name);}});const LS=k==='bar'?[[0xffb070,1.7,0,24,6],[0xff4a32,0.6,-52,20,12],[0x35d6c2,0.35,-52,16,12],[0xffc890,1.0,0,20,-36]]:[[0xffe2bd,1.5,0,30,0],[0xdcebff,0.8,-30,24,-40]];for(const q of LS){const a=new THREE.PointLight(q[0],q[1],0,0);a.position.set(q[2],q[3],q[4]);g.add(a);}g.userData.k=k==='bar'?0.5:1;SETS[k]=g;}catch(e){console.warn('set missing',k);}MW=WORLD.mw;MH=WORLD.mh;WW=MW*T;WH=MH*T;
- const md=pixels(await loadImg('data/map.png'));map=new Uint8Array(MW*MH);for(let i=0;i<MW*MH;i++)map[i]=Math.round(md[i*4]/30);
+ WORLD=await (await fetch('data/world.json'+DV)).json();try{CITY=(await new GLTFLoader().loadAsync('data/city.glb'+DV)).scene;}catch(e){console.warn('city model unavailable, using generated buildings',e);CITY=null;}
+ try{EXTRA=Object.assign(EXTRA,await (await fetch('data/extras.json'+DV)).json());}catch(e){}
+ await Promise.all(['lamp','signal','busstop','tree','pine','hydrant','bench','trash','excavator'].map(async k=>{try{PROPS[k]=(await new GLTFLoader().loadAsync('models/p_'+k+'.glb'+DV)).scene;}catch(e){console.warn('prop missing',k);}}));
+ for(const k of ['office','chamber','bar'])try{const g=(await new GLTFLoader().loadAsync('models/set_'+k+'.glb'+DV)).scene;g.visible=false;g.traverse(o=>{if(o.isMesh){o.castShadow=false;o.receiveShadow=/^floor|^shell/.test(o.name);}});const LS=k==='bar'?[[0xffb070,1.7,0,24,6],[0xff4a32,0.6,-52,20,12],[0x35d6c2,0.35,-52,16,12],[0xffc890,1.0,0,20,-36]]:[[0xffe2bd,1.5,0,30,0],[0xdcebff,0.8,-30,24,-40]];for(const q of LS){const a=new THREE.PointLight(q[0],q[1],0,0);a.position.set(q[2],q[3],q[4]);g.add(a);}g.userData.k=k==='bar'?0.5:1;SETS[k]=g;}catch(e){console.warn('set missing',k);}MW=WORLD.mw;MH=WORLD.mh;WW=MW*T;WH=MH*T;
+ const md=pixels(await loadImg('data/map.png'+DV));map=new Uint8Array(MW*MH);for(let i=0;i<MW*MH;i++)map[i]=Math.round(md[i*4]/30);
  const hd=pixels(await loadImg('data/hm.png'));gw=WORLD.gw;gh=WORLD.gh;GS=WORLD.gs*10;HMAP=new Float32Array(gw*gh);for(let i=0;i<gw*gh;i++)HMAP[i]=((hd[i*4]<<8)|hd[i*4+1])-1000;
  if(window.EV_NOAIR)AIRIMG=[null,null,null,null,null,null];else{for(let ty=0;ty<2;ty++)for(let tx=0;tx<3;tx++)AIRIMG.push(loadImg('data/airlo_'+tx+'_'+ty+'.jpg').catch(()=>null));AIRIMG=await Promise.all(AIRIMG);}
  WORLD.nodes.forEach(n=>nodes.push({x:n[0],y:n[1],nb:[],edge:false,sig:false,r:60}));
@@ -209,7 +209,7 @@ function nearCar(){let b=null,bd=48;for(const c of cars){if(c.dead)continue;cons
 let STORY=[],ST=0,stCd=2;
 try{ST=+(localStorage.getItem('everett_st')||0)|0;}catch(e){}
 function saveStory(){try{localStorage.setItem('everett_st',String(ST));}catch(e){}}
-async function loadStory(){try{const j=await (await fetch('data/story.json')).json();CAST=j.cast||{};PRO=j.prologue||[];EPI=j.epilogue||[];STORY=j.chapters.filter(c=>lm(c.at)&&c.steps.every(s=>!s.lm||lm(s.lm)));if(ST>STORY.length)ST=STORY.length;
+async function loadStory(){try{const j=await (await fetch('data/story.json'+DV,{cache:'no-store'})).json();CAST=j.cast||{};PRO=j.prologue||[];EPI=j.epilogue||[];try{const sv=String(j.v||1);if(localStorage.getItem('everett_stv')!==sv){ST=0;saveStory();localStorage.setItem('everett_stv',sv);}}catch(e){}STORY=j.chapters.filter(c=>lm(c.at)&&c.steps.every(s=>!s.lm||lm(s.lm)));if(ST>STORY.length)ST=STORY.length;
  STORY.forEach((c,i)=>{const l=lm(c.at);c.gx=l.curb.x;c.gy=l.curb.y;const x=c.gx+30,y=c.gy+10,cs=CAST[c.who]||{};c.ped={who:'st',cw:c.who,ch:cs.ch||c.ch,look:cs.look,x,y,a:Math.atan2(c.gy-y,c.gx-x),kind:'civ',col:'#ccc',said:Infinity,hi:null,story:i};});syncStoryPed();}catch(e){console.warn('story unavailable',e);STORY=[];}}
 function syncStoryPed(){for(let i=CONTACTS.length-1;i>=0;i--)if(CONTACTS[i].story!=null){const c=CONTACTS[i];if(c.story!==ST||MODE!=='story'){if(c._m){c._m.parent&&c._m.parent.remove(c._m);const k=dyn.indexOf(c);if(k>=0)dyn.splice(k,1);c._m=null;}CONTACTS.splice(i,1);}}
  if(MODE==='story'&&ST<STORY.length&&!CONTACTS.includes(STORY[ST].ped))CONTACTS.push(STORY[ST].ped);
@@ -251,7 +251,7 @@ function storyDone(m){const ch=m.ch;P.money+=ch.reward;ST++;saveStory();save();s
  playCut(shots,()=>{cl.forEach(f=>f());news();if(last)say('Story complete. Downtown and the county are yours.',6);});}
 /* ---------- SCENES: actors, shot grammar (wide, over-the-shoulder, close-up, low angle, reaction), radio lines ---------- */
 let CAST={},PRO=[],EPI=[],RQ=[],rqT=0;const PK={};
-function loadPack(id){if(PK[id]||!AC)return PK[id];return PK[id]=fetch('data/vo_'+id+'.json').then(r=>r.json()).then(j=>{for(const k in j){const b=atob(j[k]),u=new Uint8Array(b.length);for(let i=0;i<b.length;i++)u[i]=b.charCodeAt(i);AC.decodeAudioData(u.buffer,buf=>{SND[k]=buf;},()=>{});}}).catch(()=>{delete PK[id];});}
+function loadPack(id){if(PK[id]||!AC)return PK[id];return PK[id]=fetch('data/vo_'+id+'.json'+DV).then(r=>r.json()).then(j=>{for(const k in j){const b=atob(j[k]),u=new Uint8Array(b.length);for(let i=0;i<b.length;i++)u[i]=b.charCodeAt(i);AC.decodeAudioData(u.buffer,buf=>{SND[k]=buf;},()=>{});}}).catch(()=>{delete PK[id];});}
 function needPack(){if(MODE!=='story'||!AC)return;if(ST===0)loadPack('c0');if(ST<STORY.length)loadPack(STORY[ST].id);for(let i=0;i<ST-1;i++){const id=STORY[i].id;if(PK[id]){for(const k in SND)if(k.startsWith('v_'+id+'_'))delete SND[k];}}}
 function queueRadio(lines,kp){lines.forEach((l,i)=>RQ.push({k:kp+'_'+i,l}));}
 function radioStep(dt){rqT-=dt;if(!RQ.length||rqT>0)return;const q=RQ.shift(),b=SND['v_'+q.k],d=b?b.duration:Math.max(2.5,q.l.t.length/14);vo(q.k,null,null,1.8);say(((CAST[q.l.w]||{}).n||'').toUpperCase()+': '+q.l.t,d+0.9);rqT=d+0.55;}
@@ -673,7 +673,7 @@ const mat=c=>mats[c]||(mats[c]=new THREE.MeshStandardMaterial({color:new THREE.C
 const bmat=c=>mats['b'+c]||(mats['b'+c]=new THREE.MeshBasicMaterial({color:new THREE.Color(c),toneMapped:false}));
 function box(sx,sy,sz,c,x,y,z,par,m){const o=new THREE.Mesh(BOX,m||mat(c));o.scale.set(sx,sy,sz);o.position.set(x||0,y||0,z||0);o.castShadow=true;o.userData.fix=1;if(par)par.add(o);return o;}
 /* --- model loading --- */
-async function loadGLB(name){const r=await fetch('models/'+name+'.b64.txt');if(!r.ok)throw new Error(name);const bin=atob((await r.text()).trim()),u=new Uint8Array(bin.length);for(let i=0;i<bin.length;i++)u[i]=bin.charCodeAt(i);
+async function loadGLB(name){const r=await fetch('models/'+name+'.b64.txt'+DV);if(!r.ok)throw new Error(name);const bin=atob((await r.text()).trim()),u=new Uint8Array(bin.length);for(let i=0;i<bin.length;i++)u[i]=bin.charCodeAt(i);
  return new Promise((res,rej)=>new GLTFLoader().parse(u.buffer,'',res,rej));}
 function prepVehicle(key,gltf){const sp=VSPEC[key],o=gltf.scene;o.updateMatrixWorld(true);const b=new THREE.Box3().setFromObject(o,true),s=b.getSize(new THREE.Vector3()),c=b.getCenter(new THREE.Vector3());
  o.position.set(-c.x,-b.min.y,-c.z);const Rg=new THREE.Group();Rg.add(o);Rg.rotation.y=sp.ry;const k=sp.l/Math.max(s.x,s.z);Rg.scale.setScalar(k);const G=new THREE.Group();G.add(Rg);sp.w=Math.min(s.x,s.z)*k;sp.h=s.y*k;
@@ -780,7 +780,7 @@ function init3D(){
 function initMarkers(){GV.forEach((gv,i)=>MK['g'+i]=mkMarker(gv.type==='race'?'#ff5ad0':'#ffd23f',gv.type==='courier'?'COURIER':gv.type==='race'?'RACE':'EXPORT'));PKG.forEach(p=>{p.m=box(9,9,9,0,0,0,0,null,bmat('#40e0ff'));p.m.castShadow=false;scene.add(p.m);});
  MK.shop=mkMarker('#ff8a30','BODY SHOP');MK.pawn=mkMarker('#7ad06a','AMMO');MK.hosp=mkMarker('#ff5a6a','HEAL');MK.tgt=mkMarker('#ffe45a','▼');MK.story=mkMarker('#40e0ff','STORY');}
 /* --- optional: Google Photorealistic 3D Tiles. Needs the player's own Map Tiles API key and a normal web host (blocked inside the Claude artifact). --- */
-const BUILD='Nov 24 9:50pm';
+const BUILD='Nov 25 9:05pm - Act One';
 /* ---------- film pass: HDR scene -> sharpen, glow, tone map, grade, grain ---------- */
 let FX=null;const GTKU={value:1};
 function initFX(){try{const sz=ren.getDrawingBufferSize(new THREE.Vector2()),rt=new THREE.WebGLRenderTarget(sz.x,sz.y,{samples:LOW?0:4,type:THREE.HalfFloatType});rt.depthTexture=new THREE.DepthTexture(sz.x,sz.y);
