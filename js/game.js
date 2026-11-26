@@ -2,7 +2,7 @@ import * as THREE from 'three';
 import {GLTFLoader} from 'three/addons/loaders/GLTFLoader.js';
 import {clone as skClone} from 'three/addons/utils/SkeletonUtils.js';
 /* Downtown Everett built from City of Everett GIS data: street centerlines, building footprints, 2 ft contours, parks, bus stops, 2022 aerial imagery. 10 units = 1 m, one tile = 2 m. */
-const PI=Math.PI,T=20,DV='?v=1125l';
+const PI=Math.PI,T=20,DV='?v=1125m';
 let MW=0,MH=0,WW=0,WH=0,map=new Uint8Array(1),HMAP=null,gw=0,gh=0,GS=80,WORLD=null;
 const WATER=0,GRASS=1,ROAD=2,WALK=3,BLDG=4,PARK=5,CONC=6,HOUSE=7;
 const SOL=[1,0,0,0,1,0,0,0];
@@ -678,11 +678,16 @@ function buildStatic2(){
   const hg=new THREE.SphereGeometry(2.6,8,6);hg.scale(1.5,0.5,1);hg.translate(PROPS.lamp?-14:21,PROPS.lamp?73.2:70.6,0);DN.glowM=new THREE.MeshBasicMaterial({color:0x000000,toneMapped:false});DN.glow=inst(hg,DN.glowM,lmx,false);DN.glow.receiveShadow=false;DN.glow.visible=false;
   const hv=new THREE.Vector3(PROPS.lamp?-14:21,62,0);DN.lit=lmx.map(m=>hv.clone().applyMatrix4(m));
   for(let i=0;i<(LOW?2:5);i++){const pl=new THREE.PointLight(0xffd9a0,0,520,1.8);pl.visible=false;scene.add(pl);DN.pool.push(pl);}}
+ const TLA=[],TLH=[],TLL=[[[],[],[]],[[],[],[]]];
  const sb=B_();cube(sb,0,30,0,2.2,60,2.2,[0.13,0.14,0.15]);cube(sb,0,54,0,6,14,6,[0.13,0.14,0.15]);const lg=new THREE.BoxGeometry(7.4,4,7.4);
  nodes.forEach((n,ni)=>{if(!n.sig)return;for(const k of n.nb){const B=nodes[k],L=dist(n.x,n.y,B.x,B.y)||1,dx=(B.x-n.x)/L,dy=(B.y-n.y)/L,e=edges.get(ni*65536+k),x=n.x+dx*n.r-dy*(e.w/2+16),y=n.y+dy*n.r+dx*(e.w/2+16),hh=Hat(x,y);
-   sgx.push(M4().makeTranslation(x,hh,y));(Math.abs(dy)>Math.abs(dx)?nsx:ewx).push(M4().makeTranslation(x,hh+56,y));}});
+   sgx.push(M4().makeTranslation(x,hh,y));(Math.abs(dy)>Math.abs(dx)?nsx:ewx).push(M4().makeTranslation(x,hh+56,y));
+   {const la=e.w/2+16-e.w*0.22,hx=n.x+dx*n.r-dy*(e.w*0.22),hy=n.y+dy*n.r+dx*(e.w*0.22),g_=Math.abs(dy)>Math.abs(dx)?0:1,V=(a,b,c)=>new THREE.Vector3(a,b,c);
+    Q.setFromAxisAngle(UP,-Math.atan2(dx,-dy));TLA.push(M4().compose(V((x+hx)/2,hh+58,(y+hy)/2),Q,V(la,1.5,1.5)));
+    Q.setFromAxisAngle(UP,Math.atan2(dx,dy));TLH.push(M4().compose(V(hx,hh+53.5,hy),Q,V(3,10.5,2.6)));
+    for(let c=0;c<3;c++)TLL[g_][c].push(M4().compose(V(hx+dx*1.5,hh+56.8-c*3.3,hy+dy*1.5),Q,V(2.1,2.1,0.6)));}}});
  MAT.tlNS=new THREE.MeshBasicMaterial({color:0xff2020,toneMapped:false});MAT.tlEW=new THREE.MeshBasicMaterial({color:0x20ff40,toneMapped:false});
- if(sgx.length){if(PROPS.signal)instGLB(PROPS.signal,sgx,true,0,'#3a3d42');else inst(geoOf(sb),S({}),sgx,true);if(nsx.length)inst(lg,MAT.tlNS,nsx);if(ewx.length)inst(lg,MAT.tlEW,ewx);}
+ if(sgx.length){if(PROPS.signal)instGLB(PROPS.signal,sgx,true,0,'#3a3d42');else inst(geoOf(sb),S({}),sgx,true);if(TLH.length){const hm=new THREE.MeshStandardMaterial({color:0x1b1d20,roughness:0.6});inst(BOX,hm,TLA,true);inst(BOX,hm,TLH,true);MAT.tl=[0,1].map(()=>[0,1,2].map(()=>new THREE.MeshBasicMaterial({color:0x111111,toneMapped:false})));for(let g_=0;g_<2;g_++)for(let c=0;c<3;c++)if(TLL[g_][c].length)inst(BOX,MAT.tl[g_][c],TLL[g_][c],false);}}
  const bs=B_();cube(bs,0,14,0,1.4,28,1.4,[0.5,0.52,0.55]);cube(bs,0,25,0,0.8,7,6,[0.1,0.3,0.7]);if(PROPS.busstop){const bsx=[],bnx=[],trx=[],V1=new THREE.Vector3(1,1,1);for(const s of STOPS){const rd=nearestTile(s.x/T,s.y/T,ROAD,40);let ux=1,uy=0;if(rd){const L=dist(rd.x,rd.y,s.x,s.y)||1;ux=(rd.x-s.x)/L;uy=(rd.y-s.y)/L;}Q.setFromAxisAngle(UP,-Math.atan2(uy,ux));const at=(ox,oy)=>{const x=s.x+ox,y=s.y+oy;return solidAt(x,y)?null:M4().compose(new THREE.Vector3(x,Hat(x,y),y),Q,V1);};
    const m0=at(-ux*6,-uy*6)||at(ux*5,uy*5)||at(0,0),m1=at(-uy*30-ux*4,ux*30-uy*4),m2=at(uy*24,-ux*24);if(m0)bsx.push(m0);if(m1)bnx.push(m1);if(m2)trx.push(m2);}
   instGLB(PROPS.busstop,bsx,true);instGLB(PROPS.bench,bnx,true);instGLB(PROPS.trash,trx,false);}
@@ -806,7 +811,7 @@ function init3D(){
 function initMarkers(){GV.forEach((gv,i)=>MK['g'+i]=mkMarker(gv.type==='race'?'#ff5ad0':'#ffd23f',gv.type==='courier'?'COURIER':gv.type==='race'?'RACE':'EXPORT'));PKG.forEach(p=>{p.m=box(9,9,9,0,0,0,0,null,bmat('#40e0ff'));p.m.castShadow=false;scene.add(p.m);});
  MK.shop=mkMarker('#ff8a30','BODY SHOP');MK.pawn=mkMarker('#7ad06a','AMMO');MK.hosp=mkMarker('#ff5a6a','HEAL');MK.tgt=mkMarker('#ffe45a','▼');MK.story=mkMarker('#40e0ff','STORY');}
 /* --- optional: Google Photorealistic 3D Tiles. Needs the player's own Map Tiles API key and a normal web host (blocked inside the Claude artifact). --- */
-const BUILD='Nov 26 12:30am - Camera';
+const BUILD='Nov 26 1:00am - Signals, skybridge';
 /* ---------- film pass: HDR scene -> sharpen, glow, tone map, grade, grain ---------- */
 let FX=null;const GTKU={value:1};
 function initFX(){try{const sz=ren.getDrawingBufferSize(new THREE.Vector2()),rt=new THREE.WebGLRenderTarget(sz.x,sz.y,{samples:LOW?0:4,type:THREE.HalfFloatType});rt.depthTexture=new THREE.DepthTexture(sz.x,sz.y);
@@ -950,7 +955,7 @@ if(scene.fog){const gold=isDay?(1-ss(0.1,0.45,up))*(1-night):0;scene.fog.color.c
  if(time-(DN.tt||-9)>0.4){DN.tt=time;const R=(LOW?1500:2600)*(qual===0?0.65:1);for(const c of TCELLS){const v=!DN.inset&&!(GT&&gReady)&&Math.abs(c.x-P.x)+Math.abs(c.y-P.y)<R;for(const o of c.o)o.visible=v;}}}
 function render(){
  frameId++;const dt=clamp(time-lastT,0,0.05);lastT=time;gDt=dt||0.016;rayBudget=LOW?4:7;
- const SC=[0xff2a20,0xffc020,0x20ff50];MAT.tlNS.color.setHex(SC[sigState(true)]);MAT.tlEW.color.setHex(SC[sigState(false)]);
+ const SC=[0xff2a20,0xffc020,0x20ff50];MAT.tlNS.color.setHex(SC[sigState(true)]);MAT.tlEW.color.setHex(SC[sigState(false)]);if(MAT.tl){const st=[sigState(true),sigState(false)],bs=1.7/Math.max(DN.k,0.3),OFF=[0x2a0806,0x2a2006,0x062a0c];for(let g_=0;g_<2;g_++)for(let c=0;c<3;c++){const m=MAT.tl[g_][c];m.color.setHex(st[g_]===c?SC[c]:OFF[c]);if(st[g_]===c)m.color.multiplyScalar(bs);}}
  for(const c of cars){const m=ent(c,mkCar),u=m.userData,co=Math.cos(c.a),si=Math.sin(c.a),hl=c.l*0.4,hw=c.w*0.5,gy=gY(c,c===P.car),gg=GT&&c.gy!=null;m.position.set(c.x,gy,c.y);m.rotation.y=-c.a;m.visible=Math.abs(c.x-P.x)+Math.abs(c.y-P.y)<5200;
   const gp=gg?Math.atan(clamp(c.gsl||0,-0.4,0.4)):Math.atan2(Hat(c.x+co*hl,c.y+si*hl)-Hat(c.x-co*hl,c.y-si*hl),hl*2),gr=gg?0:-Math.atan2(Hat(c.x-si*hw,c.y+co*hw)-Hat(c.x+si*hw,c.y-co*hw),hw*2);
   const roll=clamp((c.lat||0)*0.004,-0.13,0.13),acc=((c.v-(u.pv==null?c.v:u.pv))||0);u.pv=c.v;u.pit=(u.pit||0)*0.85+clamp(-acc*0.01,-0.05,0.05)*0.15;u.B.rotation.x=roll+gr;u.B.rotation.z=u.pit+gp;

@@ -97,3 +97,12 @@ SITES = [
     # Broadway and 34th, north-west corner: mown grass lot
     dict(box=(20110, 18880, 20470, 19140), color='#4f7a34', fence=None, props=[]),
 ]
+
+# skybridges the footprint data draws as ground-level walls: the two footprints they belong to, the kerb-to-kerb
+# span that becomes an open bridge (corner points), and its floor and roof heights above the street
+BRIDGES = [
+    # Wetmore Ave north of California St: the office block on the west side to the parking garage on the east
+    dict(a=4235, a_keep=('x<', 16150), b=4238, b_keep=('x>', 16369), quad=[(16150, 10585), (16371, 10603), (16369, 10634), (16150, 10617)], z0=50, z1=88),
+]
+B.update({4238: dict(wall='f_garage', tint='#d8d6d0', roof='r_parking', rtint='#ffffff', shop=None)})
+

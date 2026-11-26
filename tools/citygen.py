@@ -307,6 +307,15 @@ for i, parts in blocks.SPLIT.items():
         qx, qy = [p[0] for p in P], [p[1] for p in P]
         INFO[j] = (sum(qx) / len(P), sum(qy) / len(P), abs(area2(qx, qy)) / 2)
         OVR[j] = dict(blk(d), names=OVR.get(j, {}).get('names', []))
+for br in getattr(blocks, 'BRIDGES', []):
+    for key in ('a', 'b'):
+        i = br[key]
+        op, lim = br[key + '_keep']
+        b = BLD[i]
+        qx, qy = b[3::2], b[4::2]
+        P = [(x, y) for y, x in clip_y(qy, qx, -1e9, lim)] if op == 'x<' else [(x, y) for y, x in clip_y(qy, qx, lim, 1e9)]
+        BLD[i] = [b[0], b[1], b[2]] + [v for p_ in P for v in p_]
+        INFO[i] = (sum(p_[0] for p_ in P) / len(P), sum(p_[1] for p_ in P) / len(P), abs(area2([p_[0] for p_ in P], [p_[1] for p_ in P])) / 2)
 for i, d in blocks.B.items():
     ovr(i, **blk(d))
 GONE = set(blocks.GONE)
@@ -582,6 +591,24 @@ for i, b in enumerate(BLD):
                         BF.box(plain, x, rt, y, 60, 30, 45, tuple(v * 0.8 for v in lin('#b6b3ab')), e)
                         break
 
+# ---------- skybridges: a glazed box over the street, open underneath ----------
+for br in getattr(blocks, 'BRIDGES', []):
+    q = br['quad']
+    mx_, my_ = sum(p_[0] for p_ in q) / 4, sum(p_[1] for p_ in q) / 4
+    g0 = Hat(mx_, my_)
+    z0, z1 = g0 + br['z0'], g0 + br['z1']
+    GB, PBk = BF.get(mx_, my_, 'f_glass'), BF.get(mx_, my_, 'plain')
+    steel = lin('#5a6068')
+    for k in range(4):
+        a_, c_ = q[k], q[(k + 1) % 4]
+        ln_ = math.hypot(c_[0] - a_[0], c_[1] - a_[1])
+        ua, ub, vs = wall_uv('f_glass', ln_, z1 - z0 - 6)
+        BF.quad(GB, (a_[0], z0 + 3, a_[1]), (c_[0], z0 + 3, c_[1]), (c_[0], z1 - 3, c_[1]), (a_[0], z1 - 3, a_[1]), (ua, 0.0, ub, (z1 - z0 - 6) * vs), lin('#9fb4c4'))
+        for zz in (z0, z1 - 3):
+            BF.quad(PBk, (a_[0], zz, a_[1]), (c_[0], zz, c_[1]), (c_[0], zz + 3, c_[1]), (a_[0], zz + 3, a_[1]), (0, 0, 1, 1), steel)
+    for zz, sh_ in ((z0, 0.55), (z1, 1.0)):
+        BF.quad(PBk, *[(p_[0], zz, p_[1]) for p_ in q], (0, 0, 1, 1), tuple(v * sh_ for v in steel))
+
 # ---------- cleared lots, street trees and site machines (tools/blocks.py) ----------
 NODES, EDGES, NAMES = W['nodes'], W['edges'], W['names']
 
@@ -741,6 +768,12 @@ for P in ADDED:
         for tx in range(int(min(xs) // TL), int(max(xs) // TL) + 1):
             if pip((tx + 0.5) * TL, (ty + 0.5) * TL, xs, ys):
                 mpx[tx, ty] = 120
+for br in getattr(blocks, 'BRIDGES', []):
+    xs, ys = [p_[0] for p_ in br['quad']], [p_[1] for p_ in br['quad']]
+    for ty in range(int(min(ys) // TL) - 1, int(max(ys) // TL) + 2):
+        for tx in range(int(min(xs) // TL) + 1, int(max(xs) // TL)):
+            if mpx[tx, ty] == 120:
+                mpx[tx, ty] = 60
 mp.save(REPO + '/data/map.png')
 print('extras', len(EXTRA['trees']), 'trees', len(EXTRA['props']), 'props')
 
