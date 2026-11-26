@@ -71,7 +71,7 @@ function initPlaces(){
  let s=xnode('Broadway','35th St');if(s<0)s=xnode('Broadway','34th St');if(s<0)s=nearestNode(st.cx,st.cy+3000);const sp=side(s,'35th St');SHOP={n:'Body Shop',door:sp,curb:sp};
  let w=xnode('Hewitt Ave','Maple St');if(w<0)w=xnode('Hewitt Ave','Cedar St');if(w<0)w=nearestNode(ar.cx+2000,ar.cy);const wp=side(w,'Maple St'),wc=nearestTile(wp.x/T,wp.y/T,WALK,30)||wp;PAWN={n:'Guns & Ammo',door:wp,curb:wc};
  const face=(x,y,gv)=>Math.atan2(gv.y-y,gv.x-x);
- CONTACTS=[{nm:'Dee - dispatch',who:'dee',ch:'michelle',gv:GV[0],hi:'Got a rush job if you can keep it under the limit. Kidding.'},{nm:'Olsen - dock boss',who:'olsen',ch:'rpm',gv:GV[1],hi:'I buy clean cars. Scratch it and the price drops.'},{nm:'Tink - race promoter',who:'tink',ch:'rpm',gv:GV[2],hi:'Bring wheels. Seven lights, one clock.'}].map((c,i)=>{const x=c.gv.x+34,y=c.gv.y+(i-1)*8;return Object.assign(c,{x,y,a:face(x,y,c.gv),kind:'civ',col:'#ccc',said:0});});
+ CONTACTS=[{nm:'Dee - dispatch',who:'dee',ch:'woman',gv:GV[0],hi:'Got a rush job if you can keep it under the limit. Kidding.'},{nm:'Olsen - dock boss',who:'olsen',ch:'rpm',gv:GV[1],hi:'I buy clean cars. Scratch it and the price drops.'},{nm:'Tink - race promoter',who:'tink',ch:'rpm',gv:GV[2],hi:'Bring wheels. Seven lights, one clock.'}].map((c,i)=>{const x=c.gv.x+34,y=c.gv.y+(i-1)*8;return Object.assign(c,{x,y,a:face(x,y,c.gv),kind:'civ',col:'#ccc',said:0});});
  try{pkgGot=JSON.parse(localStorage.getItem('everett_pk')||'{}')||{};}catch(e){pkgGot={};}
 }
 function say(t,s){toast={t,time:s||3};}
@@ -242,7 +242,7 @@ function storyDone(m){const ch=m.ch;P.money+=ch.reward;ST++;saveStory();save();s
  if(ch.post){const ps=(ch.pset&&SETS[ch.pset])?lm(ch.pat):null,sv=[P.x,P.y,P.a];if(ps){P.x=ps.cx-20;P.y=ps.cy;P.a=0;}const q=buildScene(ch.post,ch.id+'_post',{cutaway:1});if(ps){P.x=sv[0];P.y=sv[1];P.a=sv[2];}
   if(q.shots.length){q.shots[0].card='MEANWHILE';if(ps){const f0=q.shots[0].on;q.shots[0].on=()=>{setShow(ch.pset,ps.cx,ps.cy,Hat(ps.cx-20,ps.cy));if(f0)f0();};cl.push(setHide);}shots.push(...q.shots);cl.push(q.cleanup);}}
  if(last){EPI.forEach((l,i)=>shots.push(flyShot(l,'epi_'+i)));shots.push({cam:SH.orbit(WW/2,WH/2,2600,900,2,0.04,80),d:4,title:'HEWITT HEAT',sub:'THE END'},
-  {cam:SH.orbit(WW/2,WH/2,2600,900,2.2,0.04,80),d:10,credits:['A game by Carter Gregg, built with Claude','Map: City of Everett GIS · Google Photorealistic 3D Tiles','Vehicles: Daniel Zhabotinsky (CC BY) · Weapons: TastyTony (CC BY)','Street props and trees: Sketchfab artists, CC BY (full list in README)','Voices and sound: ElevenLabs stock voices','Every character in the story is fictional']});}
+  {cam:SH.orbit(WW/2,WH/2,2600,900,2.2,0.04,80),d:10,credits:['A game by Carter Gregg, built with Claude','Map: City of Everett GIS · Google Photorealistic 3D Tiles','Vehicles: Daniel Zhabotinsky (CC BY) · Weapons: TastyTony (CC BY)','Street props, trees and civilians: Sketchfab artists, CC BY (full list in README)','Voices and sound: ElevenLabs stock voices','Every character in the story is fictional']});}
  playCut(shots,()=>{cl.forEach(f=>f());news();if(last)say('Story complete. Downtown and the county are yours.',6);});}
 /* ---------- SCENES: actors, shot grammar (wide, over-the-shoulder, close-up, low angle, reaction), radio lines ---------- */
 let CAST={},PRO=[],EPI=[],RQ=[],rqT=0;const PK={};
@@ -669,7 +669,7 @@ function mkCar(c){const G=new THREE.Group(),B=new THREE.Group(),u=G.userData,sp=
  u.smoke=new THREE.Mesh(SPH,new THREE.MeshBasicMaterial({color:0x555555,transparent:true,opacity:0.7}));u.smoke.position.set(l*0.36,hh*0.8,0);G.add(u.smoke);
  paintCar(G,c);return G;}
 /* --- people: four rigs sharing the soldier's Idle / Walk / Run clips (retargeted) --- */
-const CH={soldier:{f:'soldier',s:10,ry:-PI/2},michelle:{f:'michelle',s:10,ry:-PI/2,cap:LOW?5:12},rpm:{f:'rpm',s:9.6,ry:-PI/2,cap:LOW?5:12,strip:1,ps:0.0102},cesium:{f:'cesium',s:11.4,ry:PI/2}};const HAIR=['#2a1d14','#5a3a22','#b08a4a','#15151a','#8a8a8a','#7a3020','#d9c9a0'];
+const CH={soldier:{f:'soldier',s:10,ry:-PI/2},michelle:{f:'michelle',s:10,ry:-PI/2,cap:LOW?5:12},rpm:{f:'rpm',s:9.6,ry:-PI/2,cap:LOW?5:12,strip:1,ps:0.0102},cesium:{f:'cesium',s:11.4,ry:PI/2},man:{f:'man',s:5.7,ry:-PI/2,ps:0.0102,cap:LOW?5:12},woman:{f:'woman',s:5.5,ry:-PI/2,ps:0.0102,cap:LOW?5:12}};const HAIR=['#2a1d14','#5a3a22','#b08a4a','#15151a','#8a8a8a','#7a3020','#d9c9a0'];
 const SHIRT=['#ffffff','#c0392b','#2e6fb0','#3c8f55','#d9a13a','#7d4fa8','#30343a','#d9d4c5','#e07a9a','#3aa6a0'],PANT=['#2a3550','#3a3a3a','#5a4a3a','#27313d','#6b6f76','#1d1d22'],TONE=['#ffffff','#e6c3a6','#c99a76','#9a6a48','#6e4a32'];
 function retarget(clip,c,tq,sq){const corr=tq.clone().invert().multiply(sq),q=new THREE.Quaternion(),v=new THREE.Vector3(),tr=[];
  for(const t of clip.tracks){const k=t.name.lastIndexOf('.'),node=t.name.slice(0,k),prop=t.name.slice(k+1),hips=/Hips$/.test(node);if(prop==='scale'||(prop==='position'&&!hips))continue;const val=Float32Array.from(t.values);
@@ -679,10 +679,10 @@ function retarget(clip,c,tq,sq){const corr=tq.clone().invert().multiply(sq),q=ne
  return new THREE.AnimationClip(clip.name,clip.duration,tr);}
 function prepChars(){const S=CH.soldier;if(!S.scene)return;const hp=o=>{let h=null;o.traverse(n=>{if(!h&&/Hips$/.test(n.name))h=n;});const q=new THREE.Quaternion();if(h&&h.parent){o.updateMatrixWorld(true);h.parent.getWorldQuaternion(q);}return q;};
  const sq=hp(S.scene),by=n=>THREE.AnimationClip.findByName(S.clips,n);S.anim={Idle:by('Idle'),Walk:by('Walk'),Run:by('Run')};
- for(const k of ['michelle','rpm']){const c=CH[k];if(!c.scene)continue;const tq=hp(c.scene);c.anim={};for(const n of ['Idle','Walk','Run'])c.anim[n]=retarget(S.anim[n],c,tq,sq);}
+ for(const k of ['rpm','man','woman']){const c=CH[k];if(!c.scene)continue;const tq=hp(c.scene);c.anim={};for(const n of ['Idle','Walk','Run'])c.anim[n]=retarget(S.anim[n],c,tq,sq);}
  if(CH.cesium.scene&&CH.cesium.clips[0])CH.cesium.anim={Walk:CH.cesium.clips[0]};}
 function pickChar(p){if(p===P)return CH.rpm.scene?'rpm':'soldier';if(p.kind==='cop')return 'soldier';const n={michelle:0,rpm:0,man:0,woman:0};for(const q of peds)if(q._m&&n[q.ch]!=null)n[q.ch]++;
- const o=[];if(CH.michelle.scene&&n.michelle<CH.michelle.cap)o.push('michelle','michelle');if(CH.rpm.scene&&n.rpm<CH.rpm.cap)o.push('rpm','rpm');if(!o.length)o.push('soldier');return pick(o);}
+ const o=[];if(CH.woman.scene&&n.woman<CH.woman.cap)o.push('woman','woman','woman');if(CH.man.scene&&n.man<CH.man.cap)o.push('man','man','man');if(!o.length&&CH.rpm.scene&&n.rpm<CH.rpm.cap)o.push('rpm','rpm');if(!o.length)o.push('soldier');return pick(o);}
 function mkPed(p){const G=new THREE.Group(),u=G.userData,pl=p===P,cop=p.kind==='cop';u.px=p.x;u.py=p.y;u.sp=0;p.ch=p.ch||pickChar(p);const c=CH[p.ch];
  if(c&&c.scene){const m=skClone(c.scene),s=c.s*(pl?1:0.94+Math.random()*0.1);m.scale.setScalar(s);m.rotation.y=c.ry;const In=new THREE.Group();In.add(m);G.add(In);u.In=In;
   const LK=p.look||{},sh=LK.sh||(pl?'#22252b':pick(SHIRT)),pa=LK.pa||(pl?'#2a3550':pick(PANT)),tn=LK.tn||(pl?TONE[1]:pick(TONE)),one=LK.one||(p.ch==='soldier'?(cop?'#3b55b8':'#d8c9a8'):p.ch==='cesium'?pick(SHIRT):pick(['#ffffff','#ffe9e2','#e6ecff','#f1ffe6','#e9e0d2']));

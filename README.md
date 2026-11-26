@@ -99,6 +99,7 @@ All from Sketchfab under CC BY 4.0, modified for the game (re-based, scaled, tex
 | Fire Hydrant [Low Poly] | Islide |
 | Low-Poly Wooden Bench | Memorie |
 | Photorealistic Trash Can (LOW POLY) | Derfmode |
+| Low Poly Male, Low Poly Female (pedestrians, Marge, the lot attendant; re-dressed by `tools/people_prep.py`) | Loves_Art |
 
 `tools/sketchfab_dl.py` and `tools/sketchfab_prep.py` rebuild them; the Sketchfab token is read from the `SKF` environment variable and is not stored in this repository.
 
