@@ -145,6 +145,12 @@ Done so far:
 | Rucker and Pacific, north-east corner | Tan two-storey building |
 | Grand Ave, California to Hewitt | Brick market building, white and orange six-storey apartments at Hewitt, grey and teal five-storey block, long white single-storey building opposite, street trees |
 | County campus | Administration tower changed to near-black glass |
+| Broadway, west side, 33rd to 34th | White five-storey apartments, tan brick building and the white-roofed one behind it added (missing from the footprint data); the corner building the recording shows as a grass lot removed; cream and white buildings toward Lombard |
+| Broadway, east side, 32nd to 33rd | Orange-tan and teal single-storey buildings, pale blue warehouse, brick two-storey |
+| Rockefeller and Wall | Brick church with a green spire, small white buildings in the lot east of it, dark glass city offices behind |
+| Hewitt Ave, Wetmore to Oakes | Street trees both sides, brick building with the pale blue metal roof at Oakes, arena roof pale blue |
+
+`GONE` and `ADD` in `tools/blocks.py` remove or add whole buildings where the recording and the footprint data disagree; citygen then also rewrites the collision map (`data/map.png`, original kept as `data/map_base.png`) so the game's walls match what is drawn.
 
 The excavator is a Meshy-generated model packed by `tools/prop_meshy.py`. The recording is 220 px wide, so signs and window detail cannot be read from it; storeys, colours and massing can.
 

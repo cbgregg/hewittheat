@@ -259,9 +259,12 @@ def blk(d):
             d[k] = lin(d[k])
     if d.get('stripe'):
         d['stripe'] = (lin(d['stripe'][0]),) + tuple(d['stripe'][1:])
+    if d.get('spire'):
+        d['spire'] = (lin(d['spire'][0]), d['spire'][1])
     if d.get('special') == 'construction':
         d.update(wall='f_sheath', tint=WHITE, shop=None, roof='plain', rtint=lin('#b89a62'), units=False, pitched=False)
-    d.setdefault('pitched', False)
+    if 'wall' in d:
+        d.setdefault('pitched', False)
     return d
 
 
@@ -305,6 +308,16 @@ for i, parts in blocks.SPLIT.items():
         OVR[j] = dict(blk(d), names=OVR.get(j, {}).get('names', []))
 for i, d in blocks.B.items():
     ovr(i, **blk(d))
+GONE = set(blocks.GONE)
+ADDED = []
+for d in blocks.ADD:
+    d = dict(d)
+    P = d.pop('poly')
+    BLD.append([d['fl'] * FLH, 1, 0] + [v for p in P for v in p])
+    qx, qy = [p[0] for p in P], [p[1] for p in P]
+    INFO.append((sum(qx) / len(P), sum(qy) / len(P), abs(area2(qx, qy)) / 2))
+    OVR[len(BLD) - 1] = dict(blk(d), names=[])
+    ADDED.append(P)
 
 CORE = lambda x, y: 12500 < x < 20500 and 9500 < y < 15500
 
@@ -359,6 +372,8 @@ BF = Bufs()
 stats = {}
 tris_total = 0
 for i, b in enumerate(BLD):
+    if i in GONE:
+        continue
     h, kind = b[0], b[1]
     n = (len(b) - 3) // 2
     px = [b[3 + k * 2] for k in range(n)]
@@ -491,6 +506,16 @@ for i, b in enumerate(BLD):
                 BF.quad(plain, (a[0], z0c, a[1]), (c[0], z0c, c[1]), (C0[0], z0c, C0[1]), (A0[0], z0c, A0[1]), (0, 0, 1, 1), tuple(v * 0.6 for v in cc))
                 BF.quad(plain, (A0[0], z0c, A0[1]), (C0[0], z0c, C0[1]), (C0[0], z1c, C0[1]), (A0[0], z1c, A0[1]), (0, 0, 1, 1), cc)
                 BF.quad(plain, (A0[0], z1c, A0[1]), (C0[0], z1c, C0[1]), (c[0], z1c, c[1]), (a[0], z1c, a[1]), (0, 0, 1, 1), tuple(min(1, v * 1.25) for v in cc))
+    if L.get('spire'):
+        # square tower and a pointed spire at the end of the building nearest the street corner
+        sc_, sh_ = L['spire']
+        k0 = max(range(n), key=lambda q: px[q] - py[q])  # north-east corner
+        tx, ty = px[k0] + (cx - px[k0]) * 0.18, py[k0] + (cy - py[k0]) * 0.18
+        BF.box(plain, tx, base, ty, 46, wt - base + 40, 46, tuple(v * 0.9 for v in tint))
+        z0s, z1s = wt + 40, wt + 40 + sh_
+        for q, (dx_, dy_) in enumerate(((-1, -1), (1, -1), (1, 1), (-1, 1))):
+            ex, ey = ((1, -1), (1, 1), (-1, 1), (-1, -1))[q]
+            BF.tri(plain, [(tx + dx_ * 25, z0s, ty + dy_ * 25), (tx + ex * 25, z0s, ty + ey * 25), (tx, z1s, ty)], [(0, 0), (1, 0), (0.5, 1)], tuple(v * (0.8 if q % 2 else 1.0) for v in sc_))
     RBf = BF.get(cx, cy, L['roof'])
     rc = L['rtint']
     if pitched:
@@ -588,7 +613,7 @@ for st, ca, cb, side, cnt, size in blocks.TREES:
 for site in blocks.SITES:
     x0, y0, x1, y1 = site['box']
     rr = random.Random(int(x0 + y0))
-    dirt = lin('#8c7656')
+    dirt = lin(site.get('color', '#8c7656'))
     PB = BF.get((x0 + x1) / 2, (y0 + y1) / 2, 'plain')
     nx_, ny_ = max(1, round((x1 - x0) / 40)), max(1, round((y1 - y0) / 40))
     gx = [x0 + (x1 - x0) * k / nx_ for k in range(nx_ + 1)]
@@ -610,6 +635,26 @@ for site in blocks.SITES:
     for nm, x, y, ang, sc in site.get('props', []):
         EXTRA['props'].append([nm, x, y, ang, sc])
 json.dump(EXTRA, open(REPO + '/data/extras.json', 'w'), separators=(',', ':'))
+# collision map: clear the tiles of removed footprints, mark the tiles of added buildings (1 tile = 20 units)
+if not os.path.exists(REPO + '/data/map_base.png'):
+    Image.open(REPO + '/data/map.png').save(REPO + '/data/map_base.png')
+mp = Image.open(REPO + '/data/map_base.png').convert('L')
+mpx = mp.load()
+TL = 20
+for i in GONE:
+    b = W['bld'][i]
+    xs, ys = b[3::2], b[4::2]
+    for ty in range(int(min(ys) // TL) - 1, int(max(ys) // TL) + 2):
+        for tx in range(int(min(xs) // TL) - 1, int(max(xs) // TL) + 2):
+            if mpx[tx, ty] == 120:
+                mpx[tx, ty] = 30
+for P in ADDED:
+    xs, ys = [p[0] for p in P], [p[1] for p in P]
+    for ty in range(int(min(ys) // TL), int(max(ys) // TL) + 1):
+        for tx in range(int(min(xs) // TL), int(max(xs) // TL) + 1):
+            if pip((tx + 0.5) * TL, (ty + 0.5) * TL, xs, ys):
+                mpx[tx, ty] = 120
+mp.save(REPO + '/data/map.png')
 print('extras', len(EXTRA['trees']), 'trees', len(EXTRA['props']), 'props')
 
 # ---------- write GLB ----------
