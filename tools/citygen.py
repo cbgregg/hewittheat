@@ -221,7 +221,7 @@ ovr(5768, wall='f_metal', tint=lin('#9aa4ad'), shop='shop_modern', roof='r_seam'
 ovr(5805, wall='f_garage', tint=WHITE, shop=None, roof='r_parking', rtint=WHITE, names=['County parking garage'])
 named('Everett Station', wall='f_brick_red', tint=(0.82, 0.78, 0.78), shop=None, roof='r_seam', rtint=lin('#4f8a6f'), pitched=True)
 named('Snohomish County Courthouse', wall='f_concrete', tint=(0.9, 0.9, 0.9), shop=None, roof='r_gravel', rtint=WHITE)
-i = nearest('Snohomish County Courthouse', maxd=1500, tallest=True)
+i = 4599  # 3000 Rockefeller Ave, 94 ft by LiDAR: the tallest building on the county campus
 if i is not None and i not in OVR:
     ovr(i, wall='f_glass', tint=lin('#3a4048'), shop=None, roof='r_membrane', rtint=(0.9, 0.9, 0.9), names=['County administration tower'])  # near-black glass in the flyover
 named('City Hall', wall='f_brick_buff', tint=WHITE, shop=None, roof='r_gravel', rtint=WHITE)
@@ -318,9 +318,11 @@ for br in getattr(blocks, 'BRIDGES', []):
         INFO[i] = (sum(p_[0] for p_ in P) / len(P), sum(p_[1] for p_ in P) / len(P), abs(area2([p_[0] for p_ in P], [p_[1] for p_ in P])) / 2)
 for i, d in blocks.B.items():
     ovr(i, **blk(d))
+HAND = set()
 if os.path.exists(REPO + '/data/overrides.json'):
     for k_, d_ in json.load(open(REPO + '/data/overrides.json')).items():
         ovr(int(k_), **blk(d_))
+        HAND.add(int(k_))
 GONE = set(blocks.GONE)
 ADDED = []
 for d in blocks.ADD:
@@ -333,6 +335,24 @@ for d in blocks.ADD:
     ADDED.append(P)
 
 CORE = lambda x, y: 12500 < x < 20500 and 9500 < y < 15500
+
+# whole-map measurements (tools/dossier_all.py). Footprints that were split, removed or added by hand are left alone.
+AUTO = {}
+if os.path.exists(REPO + '/data/dossier/auto.json'):
+    AUTO = {int(k): v for k, v in json.load(open(REPO + '/data/dossier/auto.json')).items() if int(k) not in blocks.SPLIT and int(k) not in GONE and v}
+
+
+def _texmean(name):
+    im = Image.open(REPO + '/tex/b/%s.jpg' % name).convert('RGB').resize((32, 32))
+    px = [im.getpixel((x, y)) for x in range(32) for y in range(32)]
+    return tuple(max(0.03, sum(lin('#%02x%02x%02x' % p)[q] for p in px) / len(px)) for q in range(3))
+
+
+TEXM = {k: _texmean(k) for k in ('r_membrane', 'r_gravel', 'r_shingle', 'r_seam')}
+# every house roof as read from the aerial (tools/houses.py)
+HOUSES = {}
+if os.path.exists(REPO + '/data/dossier/houses.json'):
+    HOUSES = {int(k): v for k, v in json.load(open(REPO + '/data/dossier/houses.json'))['houses'].items()}
 
 
 def look(i):
@@ -376,8 +396,29 @@ def look(i):
         rf = pick(r, [('r_membrane', 62), ('r_gravel', 38)] if not core or h > 120 else [('r_membrane', 45), ('r_gravel', 55)])
         rt = r.choice([(0.86, 0.86, 0.86), (0.82, 0.83, 0.84), (0.66, 0.67, 0.68), (0.8, 0.77, 0.7)]) if rf == 'r_membrane' else r.choice([(1, 1, 1), (0.7, 0.7, 0.7), (0.55, 0.55, 0.56)])
         L.update(wall=w, tint=t, shop=shop, roof=rf, rtint=rt)
+    au = AUTO.get(i)
+    ar = None
+    if au:
+        # measured from public records by tools/dossier_all.py; hand-set looks below still win
+        if au.get('lead') is not None:
+            Lb = look(au['lead'])
+            L.update({k: Lb[k] for k in ('wall', 'tint', 'shop', 'awn', 'stripe', 'pitched', 'units') if k in Lb})
+        if 'hft' in au:
+            L['hft'] = min(au['hft'], 38) if kind == 0 else min(au['hft'], 16) if kind == 3 else au['hft']
+        if 'rc' in au and L['special'] is None and not L['pitched']:   # pitched roofs read unreliably from above (lit and shaded faces, trees)
+            c = [int(au['rc'][q:q + 2], 16) for q in (1, 3, 5)]
+            lum = 0.3 * c[0] + 0.59 * c[1] + 0.11 * c[2]
+            c = [int(v * 0.5 + lum * 0.5) for v in c]   # the aerial has a green cast; keep the brightness, halve the colour
+            rf = (L['roof'] if L['roof'] in TEXM else 'r_shingle') if L['pitched'] else ('r_seam' if lum < 150 else 'r_membrane') if kind == 4 else ('r_membrane' if lum > 150 else 'r_gravel')
+            ar = dict(roof=rf, rtint=tuple(min(1.0, lin('#%02x%02x%02x' % tuple(c))[q] / TEXM[rf][q]) for q in range(3)))
+            L.update(ar)
+        for k in ('shopon', 'blank'):
+            if k in au:
+                L[k] = au[k]
     if i in OVR:
         L.update({k: v for k, v in OVR[i].items() if k != 'names'})
+        if ar and i not in blocks.B and i not in HAND and not L['pitched'] and L['roof'] in TEXM:
+            L.update(ar)      # landmark looks set by name guessed the roof; the aerial colour is better
     return L
 
 
@@ -403,6 +444,8 @@ for i, b in enumerate(BLD):
     L = look(i)
     if L.get('fl'):
         h = L['fl'] * FLH + (10 if L.get('special') != 'construction' else 0)
+    if L.get('hft'):
+        h = L['hft'] * 3.048  # measured roof height in feet (county LiDAR, via tools/dossier.py)
     base, top = lo - 4, gm + h
     r = random.Random(i * 104729 + 7)
     stats[L['wall']] = stats.get(L['wall'], 0) + 1
@@ -434,6 +477,8 @@ for i, b in enumerate(BLD):
     pitched = L['pitched']
     rise = 0
     RA = RB = None
+    hz = None
+    gable = False
     if pitched:
         sxx = sum((x - cx) ** 2 for x in px)
         syy = sum((y - cy) ** 2 for y in py)
@@ -444,8 +489,12 @@ for i, b in enumerate(BLD):
         vs_ = [-(px[k] - cx) * ay + (py[k] - cy) * ax for k in range(n)]
         u0, u1, v0, v1 = min(us), max(us), min(vs_), max(vs_)
         lng = (u1 - u0) >= (v1 - v0)
+        hz = HOUSES.get(i) if (kind in (0, 3) and i not in OVR) else None
+        if hz and hz.get('ax'):
+            lng = not lng            # the aerial shows the ridge running across the short side
         le, se = (u1 - u0, v1 - v0) if lng else (v1 - v0, u1 - u0)
-        hl = max(0, (le - se) / 2)
+        gable = bool(hz) and not hz.get('hip')
+        hl = le / 2 if gable else max(0, (le - se) / 2)
         uc, vc = (u0 + u1) / 2, (v0 + v1) / 2
         mx, my = cx + uc * ax - vc * ay, cy + uc * ay + vc * ax
         dx, dy = (ax, ay) if lng else (-ay, ax)
@@ -479,7 +528,10 @@ for i, b in enumerate(BLD):
         if gm - min(es[k], es[j]) > 2.5:
             BF.quad(plain, (a[0], base, a[1]), (c[0], base, c[1]), (c[0], gm, c[1]), (a[0], gm, a[1]), (0, 0, 1, 1), found)
         z0 = gm
-        if sh:
+        onx, ony = (py[j] - py[k]) / ln, -(px[j] - px[k]) / ln
+        side = ('E' if onx > 0 else 'W') if abs(onx) > abs(ony) else ('S' if ony > 0 else 'N')
+        shw = sh if (L.get('shopon') is None or side in L['shopon']) else 0
+        if shw:
             SB = BF.get(cx, cy, shop)
             ns = max(1, round(ln / 80))
             if ln < 30:
@@ -487,16 +539,26 @@ for i, b in enumerate(BLD):
             else:
                 BF.quad(SB, (a[0], z0, a[1]), (c[0], z0, c[1]), (c[0], z0 + sh, c[1]), (a[0], z0 + sh, a[1]), (0, 0, ns, 1), WHITE, 0.7)
             z0 += sh
-        ua, ub, vs = wall_uv(wm, ln, max(hh, 8))
+        ua, ub, vs = wall_uv(wm, ln, max(rt - z0, 8))
         st = L.get('stripe')
         nseg = max(1, round(ln / st[1])) if st and ln > st[1] * 0.75 else 1
+        if side in (L.get('blank') or '') and FAC[wm][4] and not FAC[wm][5] and ln > FAC[wm][4]:
+            # party or alley wall: repeat the windowless strip of the facade tile along the whole wall
+            bw = max(FAC[wm][4], ln / 48)
+            nq = max(1, round(ln / bw))
+            for q in range(nq):
+                t0, t1 = q / nq, (q + 1) / nq
+                sa_, sc_ = (a[0] + (c[0] - a[0]) * t0, a[1] + (c[1] - a[1]) * t0), (a[0] + (c[0] - a[0]) * t1, a[1] + (c[1] - a[1]) * t1)
+                BF.quad(WB, (sa_[0], z0, sa_[1]), (sc_[0], z0, sc_[1]), (sc_[0], rt, sc_[1]), (sa_[0], rt, sa_[1]),
+                        (-FAC[wm][4] / 2 / FAC[wm][0], 0.0, FAC[wm][4] / 2 / FAC[wm][0], (rt - z0) * vs), tuple(v * 0.9 for v in tint), 0.72)
+            nseg = 0
         for q in range(nseg):
             t0, t1 = q / nseg, (q + 1) / nseg
             sa_, sc_ = (a[0] + (c[0] - a[0]) * t0, a[1] + (c[1] - a[1]) * t0), (a[0] + (c[0] - a[0]) * t1, a[1] + (c[1] - a[1]) * t1)
             BF.quad(WB, (sa_[0], z0, sa_[1]), (sc_[0], z0, sc_[1]), (sc_[0], rt, sc_[1]), (sa_[0], rt, sa_[1]),
                     (ua + (ub - ua) * t0, 0.0, ua + (ub - ua) * t1, (rt - z0) * vs), st[0] if st and (q + k) % (st[2] if len(st) > 2 else 2) == (st[2] if len(st) > 2 else 2) - 1 else tint, 0.9 if sh else 0.72)
         onx, ony = (py[j] - py[k]) / ln, -(px[j] - px[k]) / ln
-        if L.get('awn') and sh and ln > 60:
+        if L.get('awn') and shw and ln > 60:
             na = max(1, round(ln / 80))
             for q in range(na):
                 t0, t1 = (q + 0.12) / na, (q + 0.88) / na
@@ -534,6 +596,44 @@ for i, b in enumerate(BLD):
             BF.tri(plain, [(tx + dx_ * 25, z0s, ty + dy_ * 25), (tx + ex * 25, z0s, ty + ey * 25), (tx, z1s, ty)], [(0, 0), (1, 0), (0.5, 1)], tuple(v * (0.8 if q % 2 else 1.0) for v in sc_))
     RBf = BF.get(cx, cy, L['roof'])
     rc = L['rtint']
+    if hz and hz.get('rc') and L['roof'] == 'r_shingle':
+        hc = '#74777a' if hz['rc'] == '#4d5a4c' else hz['rc']          # a green reading is moss or canopy over a grey roof
+        rc = tuple(min(1.0, lin(hc)[q] / TEXM['r_shingle'][q]) for q in range(3))
+    if hz and kind == 0 and hz.get('fa') is not None and h > 50:
+        # front door on the street side; a porch on houses from before about 1950 (era from the county sales layer, see tools/houses.py)
+        fx, fy = math.cos(hz['fa']), math.sin(hz['fa'])
+        kb, sb = None, 0
+        for k in range(n):
+            j = (k + 1) % n
+            ln = math.hypot(px[j] - px[k], py[j] - py[k])
+            if ln < 45:
+                continue
+            sc_ = ((py[j] - py[k]) / ln * fx - (px[j] - px[k]) / ln * fy) * min(ln, 120)
+            if sc_ > sb:
+                kb, sb = k, sc_
+        if kb is not None:
+            k, j = kb, (kb + 1) % n
+            ln = math.hypot(px[j] - px[k], py[j] - py[k])
+            ex, ey = (px[j] - px[k]) / ln, (py[j] - py[k]) / ln
+            ox_, oy_ = ey, -ex
+            f_ = 0.5 + ((i * 13) % 5 - 2) * 0.09
+            mx_, my_ = px[k] + (px[j] - px[k]) * f_, py[k] + (py[j] - py[k]) * f_
+            ang = math.atan2(ey, ex)
+            dr_ = lin(['#5a2f28', '#2f3f52', '#e6e2d6', '#3a3d42', '#6b4a2e'][i % 5])
+            d0, d1 = (mx_ - ex * 4.5 + ox_ * 0.5, my_ - ey * 4.5 + oy_ * 0.5), (mx_ + ex * 4.5 + ox_ * 0.5, my_ + ey * 4.5 + oy_ * 0.5)
+            fl_ = gm + 5
+            BF.quad(plain, (d0[0], fl_, d0[1]), (d1[0], fl_, d1[1]), (d1[0], fl_ + 20.5, d1[1]), (d0[0], fl_ + 20.5, d0[1]), (0, 0, 1, 1), dr_)
+            trim = lin('#efece4')
+            if hz.get('yr', 9999) < 1950 and ln > 55:
+                pw = min(ln * 0.62, 70.0)
+                pxc, pyc = mx_ + ox_ * 9.5, my_ + oy_ * 9.5
+                BF.box(plain, pxc, base, pyc, pw, fl_ - base, 19, lin('#9a968c'), ang)
+                for s_ in (-1, 1):
+                    BF.box(plain, pxc + ex * s_ * (pw / 2 - 1.5) + ox_ * 8, fl_, pyc + ey * s_ * (pw / 2 - 1.5) + oy_ * 8, 1.6, 21, 1.6, trim, ang)
+                BF.box(plain, pxc + ox_ * 1.0, fl_ + 21, pyc + oy_ * 1.0, pw + 5, 2.2, 23, tuple(v * 0.8 for v in rc), ang)
+                BF.box(plain, mx_ + ox_ * 22, base, my_ + oy_ * 22, 13, max(1.0, (fl_ - base) * 0.5), 7, lin('#b9b6ac'), ang)
+            else:
+                BF.box(plain, mx_ + ox_ * 4, base, my_ + oy_ * 4, 13, fl_ - base, 8, lin('#b9b6ac'), ang)
     if pitched:
         S = 64.0
         E = [(RA[0], wt + rise, RA[1]), (RB[0], wt + rise, RB[1])]
@@ -548,6 +648,11 @@ for i, b in enumerate(BLD):
             j = (k + 1) % n
             vi, vj = (px[k], wt, py[k]), (px[j], wt, py[j])
             a_, b_ = ne(px[k], py[k]), ne(px[j], py[j])
+            if a_ == b_ and gable and abs((px[j] - px[k]) * dx + (py[j] - py[k]) * dy) < 0.5 * math.hypot(px[j] - px[k], py[j] - py[k]):
+                # gable end: the wall carries on up to the ridge in siding
+                gl = math.hypot(px[j] - px[k], py[j] - py[k])
+                BF.tri(WB, [vi, vj, E[a_]], [(-0.3, 0.0), (0.3, 0.0), (0.0, rise / 30.0)] if wm in ('f_siding', 'f_lap') else [(0.0, 0.0), (gl / 64.0, 0.0), (gl / 128.0, rise / 64.0)], tuple(v * 0.94 for v in tint))
+                continue
             if a_ == b_:
                 T = [(vi, vj, E[a_])]
             else:
@@ -572,6 +677,10 @@ for i, b in enumerate(BLD):
             uvf = lambda x, y: (x / 64.0 - ox, y / 64.0 - oy)
         for t in tr:
             BF.tri(RBf, [(px[q], rt, py[q]) for q in t], [uvf(px[q], py[q]) for q in t], rc)
+        if L.get('pent'):
+            # mechanical penthouse: (east-west size, north-south size, height in feet, colour, offset east, offset south) in world units
+            pw, pd, ph, pc_, pox, poy = L['pent']
+            BF.box(plain, cx + pox, rt, cy + poy, pw, ph * 3.048, pd, lin(pc_))
         # rooftop plant
         if L['units'] and A > 15000 and L['roof'] != 'r_parking':
             cnt = max(1, min(7, int(A / 45000) + 1))
@@ -678,87 +787,14 @@ def bsolid(x, y):
     return 0 <= tx < _mp.width and 0 <= ty < _mp.height and _mx[tx, ty] == 120
 
 
-ADJ = {}
-for e in EDGES:
-    a, b = NODES[e[0]], NODES[e[1]]
-    ln = math.hypot(b[0] - a[0], b[1] - a[1])
-    if ln < 1:
-        continue
-    d = ((b[0] - a[0]) / ln, (b[1] - a[1]) / ln)
-    ADJ.setdefault(e[0], []).append((e[3], d))
-    ADJ.setdefault(e[1], []).append((e[3], (-d[0], -d[1])))
-SW, KH = 24.0, 1.6
-walkc, kerbc, paint = lin('#c4c1b8'), tuple(v * 0.55 for v in lin('#a8a59d')), (0.82, 0.82, 0.8)
-SIG = set(W['sig'])
-
-
-def hold(node, d):
-    cross = [ww for ww, dd in ADJ.get(node, []) if abs(dd[0] * d[0] + dd[1] * d[1]) < 0.7]
-    return (max(cross) / 2 + (0 if abs(d[0]) >= abs(d[1]) else SW), max(cross)) if cross else (0, 0)
-
-
-EXTRA['trees'] = []
-nwalk = ncross = 0
-for ei, e in enumerate(EDGES):
-    a, b, w = NODES[e[0]], NODES[e[1]], e[3]
-    ln = math.hypot(b[0] - a[0], b[1] - a[1])
-    if ln < 60:
-        continue
-    dx, dy = (b[0] - a[0]) / ln, (b[1] - a[1]) / ln
-    (ta, wa), (tb, wb) = hold(e[0], (dx, dy)), hold(e[1], (dx, dy))
-    run = ln - ta - tb
-    if run < 40:
-        continue
-    n = max(1, round(run / 170))
-    for side in (1, -1):
-        nx, ny = -dy * side, dx * side
-        for k in range(n):
-            t0, t1 = ta + run * k / n, ta + run * (k + 1) / n
-            sw = SW
-            mxq, myq = a[0] + dx * (t0 + t1) / 2 + nx * (w / 2 + SW), a[1] + dy * (t0 + t1) / 2 + ny * (w / 2 + SW)
-            if bsolid(mxq, myq):
-                sw = 11.0
-                if bsolid(a[0] + dx * (t0 + t1) / 2 + nx * (w / 2 + sw), a[1] + dy * (t0 + t1) / 2 + ny * (w / 2 + sw)):
-                    continue
-            P0 = (a[0] + dx * t0 + nx * w / 2, a[1] + dy * t0 + ny * w / 2)
-            P1 = (a[0] + dx * t1 + nx * w / 2, a[1] + dy * t1 + ny * w / 2)
-            Q0, Q1 = (P0[0] + nx * sw, P0[1] + ny * sw), (P1[0] + nx * sw, P1[1] + ny * sw)
-            h = [Hat(*q) for q in (P0, P1, Q1, Q0)]
-            WBk = BF.get(mxq, myq, 'g_walk')
-            BF.quad(WBk, (P0[0], h[0] + KH, P0[1]), (P1[0], h[1] + KH, P1[1]), (Q1[0], h[2] + KH, Q1[1]), (Q0[0], h[3] + KH, Q0[1]), (0.0, 0.0, (t1 - t0) / 64.0, sw / 64.0), walkc)
-            BF.quad(BF.get(mxq, myq, 'plain'), (P0[0], h[0] - 0.3, P0[1]), (P1[0], h[1] - 0.3, P1[1]), (P1[0], h[1] + KH, P1[1]), (P0[0], h[0] + KH, P0[1]), (0, 0, 1, 1), kerbc)
-            nwalk += 1
-        # street trees in the planting strip: close together downtown, sparser outside it
-        core = CORE((a[0] + b[0]) / 2, (a[1] + b[1]) / 2)
-        if not core and (ei + (side > 0)) % 2:
-            continue
-        gap = 120.0 if core else 330.0
-        rr = random.Random(ei * 31 + side)
-        t = ta + 45 + rr.uniform(0, gap * 0.5)
-        while t < ln - tb - 45:
-            x, y = a[0] + dx * t + nx * (w / 2 + 10), a[1] + dy * t + ny * (w / 2 + 10)
-            if not bsolid(x, y) and not bsolid(x + nx * 16, y + ny * 16):
-                EXTRA['trees'].append([round(x), round(y), round(rr.uniform(0.62, 0.95), 2)])
-            t += gap * rr.uniform(0.85, 1.2)
-    # ladder crosswalks on each approach to a signal
-    for node, (t_, wc), sgn in ((e[0], (ta, wa), 1), (e[1], (tb, wb), -1)):
-        if node not in SIG or not wc:
-            continue
-        o = NODES[node]
-        c0 = wc / 2 + 7
-        for q in range(int(w / 9)):
-            lat = -w / 2 + 4.5 + q * 9
-            c = [(o[0] + sgn * dx * (c0 + u) - dy * (lat + v), o[1] + sgn * dy * (c0 + u) + dx * (lat + v)) for u, v in ((0, -2.2), (17, -2.2), (17, 2.2), (0, 2.2))]
-            BF.quad(BF.get(o[0], o[1], 'plain'), *[(x, Hat(x, y) + 0.45, y) for x, y in c], (0, 0, 1, 1), paint)
-        sl = [(o[0] + sgn * dx * (c0 + u) - dy * v, o[1] + sgn * dy * (c0 + u) + dx * v) for u, v in ((22, -w / 2 + 2), (25, -w / 2 + 2), (25, w / 2 - 2), (22, w / 2 - 2))]
-        BF.quad(BF.get(o[0], o[1], 'plain'), *[(x, Hat(x, y) + 0.45, y) for x, y in sl], (0, 0, 1, 1), paint)
-        ncross += 1
-print('sidewalk segments', nwalk, 'crosswalks', ncross, 'street trees', len(EXTRA['trees']))
+import streets
+SIGN = sorted(set(json.load(open(REPO + '/data/dossier/signals.json'))['nodes'])) if os.path.exists(REPO + '/data/dossier/signals.json') else W['sig']
+STREET, STREET_TILES = streets.build(BF, W, Hat, bsolid, CORE, lin, EXTRA, SIGN, REPO)
 json.dump(EXTRA, open(REPO + '/data/extras.json', 'w'), separators=(',', ':'))
 # collision map: clear the tiles of removed footprints, mark the tiles of added buildings (1 tile = 20 units)
 if not os.path.exists(REPO + '/data/map_base.png'):
     Image.open(REPO + '/data/map.png').save(REPO + '/data/map_base.png')
-mp = Image.open(REPO + '/data/map_base.png').convert('L')
+mp = STREET_TILES(Image.open(REPO + '/data/map_base.png').convert('L'))
 mpx = mp.load()
 TL = 20
 for i in GONE:

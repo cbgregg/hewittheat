@@ -1,0 +1,23 @@
+<!doctype html><meta charset=utf-8><title>City model preview (dev)</title>
+<style>html,body{margin:0;height:100%;overflow:hidden;background:#9fb7cf}</style>
+<script type="importmap">{"imports":{"three":"../lib/three/build/three.module.min.js"}}</script>
+<script type=module>
+// Dev-only viewer for data/city.glb, used by tools/shot.py for before/after stills.
+// ?glb=path  &p=x,h,y (camera, world units, h above datum)  &t=x,h,y (target)  &fov=  &ortho=width (top-down, north up)  &gy=x0,h0,x1,h1 (ground plane sloping along x)
+import * as THREE from 'three';
+import {GLTFLoader} from '../lib/three/examples/jsm/loaders/GLTFLoader.js';
+const q=new URLSearchParams(location.search),v=(k,d)=>(q.get(k)||d).split(',').map(Number);
+const ren=new THREE.WebGLRenderer({antialias:true,preserveDrawingBuffer:true});ren.setSize(innerWidth,innerHeight);document.body.appendChild(ren.domElement);
+ren.outputColorSpace=THREE.SRGBColorSpace;ren.toneMapping=THREE.ACESFilmicToneMapping;ren.toneMappingExposure=1.05;
+const sc=new THREE.Scene();sc.background=new THREE.Color('#a9c1d9');
+sc.add(new THREE.HemisphereLight('#dfe9f5','#6b6a66',1.5));const sun=new THREE.DirectionalLight('#fff3df',2.6);sun.position.set(-0.5,1,0.55);sc.add(sun);
+const p=v('p','15600,300,12700'),t=v('t','15600,80,11900');let cam;
+if(q.get('ortho')){const w=+q.get('ortho'),h=w*innerHeight/innerWidth;cam=new THREE.OrthographicCamera(-w/2,w/2,h/2,-h/2,1,20000);cam.position.set(t[0],5000,t[2]);cam.up.set(0,0,-1);cam.lookAt(t[0],0,t[2]);sun.position.set(-0.2,1,0.2);}
+else{cam=new THREE.PerspectiveCamera(+q.get('fov')||55,innerWidth/innerHeight,5,60000);cam.position.set(p[0],p[1],p[2]);cam.lookAt(t[0],t[1],t[2]);}
+const g=await new GLTFLoader().loadAsync(q.get('glb')||'../data/city.glb');sc.add(g.scene);
+const box=new THREE.Box3().setFromObject(g.scene);
+if(q.get('gy')){const[xa,ha,xb,hb]=v('gy','');const k=(hb-ha)/(xb-xa),X0=xa-8000,X1=xb+8000,ge=new THREE.BufferGeometry();
+ ge.setAttribute('position',new THREE.Float32BufferAttribute([X0,ha+(X0-xa)*k,t[2]-9000,X1,ha+(X1-xa)*k,t[2]-9000,X1,ha+(X1-xa)*k,t[2]+9000,X0,ha+(X0-xa)*k,t[2]+9000],3));ge.setIndex([0,2,1,0,3,2]);ge.computeVertexNormals();
+ sc.add(new THREE.Mesh(ge,new THREE.MeshLambertMaterial({color:'#6f7173'})));}
+let n=0;(function f(){ren.render(sc,cam);if(++n<40)requestAnimationFrame(f);else window.READY=[box.min.toArray(),box.max.toArray()];})();
+</script>

@@ -194,3 +194,95 @@ The film pass switches itself off on devices that cannot hold 25 frames a second
 
 `buildings.html` (on the site at `/buildings.html`) lists every building in the game on a map: tap one to see its number, nearest landmark, kind, storeys, footprint size and the wall and roof it currently has, with a link to street view at its approximate real position. A form sets the wall, colours, storeys, storefront, awning and state and takes a note. Changes are kept in the browser; Export or Copy produces `overrides.json`. Put that file in `data/` and run `tools/citygen.py` to rebuild the city with those changes (`data/buildings.json` is the list the browser reads, written by the same tool).
 
+
+## Building dossiers (internal)
+
+`tools/dossier.py NAME X0 Y0 X1 Y1` is a reference tool for whoever is setting the buildings, not part of the game. For every footprint in a box of the map it joins the public records for that spot and cuts aerial crops, then writes one sheet per building to `dossier/NAME/index.html`:
+
+| Source | What it gives |
+|---|---|
+| City of Everett building footprints | Street address, use code |
+| Snohomish County parcels | Parcel number, situs address, assessor use code, lot size |
+| Snohomish County roofprints | LiDAR roof height in feet (mean, 95th percentile, max) |
+| Snohomish County 911 address points | Every address on the footprint and its use |
+| City, state and national registers | Historic name, construction year, district |
+| County 2024 and city 2022 aerials, 3 in per pixel | Roof colour, roof layout, light wells, awnings, which footprints share one roof |
+| Wikimedia Commons | Links to geotagged street photos nearby |
+
+The game map is tied to State Plane coordinates by a fit against the city footprints (median error 0.17 ft), so the crops line up with the footprints.
+
+`dossier/` is not committed: the aerial photos are reference only and nothing from them goes into a game asset. A trimmed copy of the records (no owner names, no values) is kept in `data/dossier/NAME.json`.
+
+Not available from here: the assessor's per-structure page (year built, storeys, construction class) refuses automated requests, so storeys come from LiDAR height instead. Aerials look straight down, so wall material is only certain where a wall edge shows or a street photo exists; `tools/blocks.py` marks each wall as seen, from a record, or inferred.
+
+Hewitt Ave from Colby to Oakes is the first stretch set this way (48 footprints, 23 buildings). `tools/citygen.py` gained `hft` (measured height), `shopon` (which sides get a storefront), `blank` (windowless party and alley walls) and `pent` (rooftop penthouse).
+
+`tools/shot.py OUT.png "p=x,h,y&t=x,h,y"` takes stills of `data/city.glb` through `tools/preview.html` in headless Chrome, for before and after checks.
+
+### Whole map
+
+`tools/dossier_all.py` runs the same joins for all 6,399 footprints and reads each roof colour from the county 2024 aerial at 1 ft per pixel. It writes `data/dossier/all.json` (address, parcel, use code, LiDAR height and register name per footprint) and `data/dossier/auto.json`, which `tools/citygen.py` applies underneath the hand-set looks in `tools/blocks.py`:
+
+| Applied automatically | Coverage |
+|---|---|
+| Roof height from LiDAR | 5,792 footprints (the rest have no roofprint, mostly sheds, and keep their old height) |
+| Flat roof material and colour from the aerial | Commercial, apartment and industrial buildings; house roofs keep their generated shingle colours |
+| One look for touching footprints on one parcel at the same height | 116 buildings made of 299 footprints |
+| Storefronts only on sides that face a street, blank walls where a neighbour touches | 1,425 non-house buildings |
+
+Wall materials are still generated from the building kind except where `tools/blocks.py` sets them. LiDAR also corrected which footprint is the county administration tower (3000 Rockefeller Ave, 94 ft).
+
+## Streets, junctions and trees
+
+`tools/streets.py` (called by `tools/citygen.py`) builds every street from the network as junction-to-junction runs:
+
+- Kerbs with rounded corner returns, sidewalks (3.6 m downtown; elsewhere a planting strip and a 1.6 m walk; narrowed where a building stands), a separate kerb cap, tactile pads at crossings, tree pits downtown.
+- Paint: double yellow centre lines, dashed lane lines and edge lines on the four-lane streets, parking lanes with stall ticks downtown, continental crosswalks, stop lines on the approach lanes, manhole covers and corner drains.
+- The road channel of `data/mask.png` is redrawn from the same geometry, so asphalt runs exactly kerb to kerb (`data/mask_roads0.png` keeps the earlier mask).
+- `data/street.json`: what the game stands up at each junction.
+
+Junction control:
+
+| Junction | Count | How it is chosen |
+|---|---|---|
+| Signalised | 67 | The city's pedestrian push-button records name every signalised intersection (`data/dossier/signals.json`); the map had 23 before |
+| Stop signs | 198 signs | Side streets meeting a wider street; all-way stops where equal streets meet downtown |
+| Uncontrolled | the rest | Residential junctions of equal streets |
+
+In the game each signal approach gets a pole with a tapered mast arm and a street-light arm, heads with backplates, yellow reflective borders and tunnel visors (one per lane on the arm, one on the pole), pedestrian heads showing a walking figure, then a flashing hand with a countdown, a push button, a street-name blade on the arm and a controller cabinet on one corner. The cycle is 44 seconds: green, 3.5 seconds of yellow, then 2.5 seconds with every direction red. Stop signs carry both street names on blades. Traffic stops at the stop lines on red and comes to a full stop at stop signs before going. Pedestrians cross at the signalised crosswalks and wait for the walk signal.
+
+Real street widths: `tools/street_data.py` measures every street against the City of Everett's kerb lines (rays cast from the centreline to the first kerb each side) and writes the real kerb-to-kerb width into `data/world.json`: 703 of 756 runs measured, the rest keep their class width. Hewitt is 20.9 m (it was drawn at 12), Colby 19.8, Wetmore 15.4. Parking follows from the width: 45 degree stalls where 5.2 m fits beside the traffic lane (Colby), parallel stalls where 2.3 m fits, none otherwise. That layout is inferred from width, not surveyed. Kerb loops in the middle of a street are the real median islands (44, including Hewitt's): raised, planted, with their real trees. Outside downtown the walk sits behind a 1.4 m planting strip. The collision map's road and sidewalk tiles are rewritten from the same geometry.
+
+Trees: `tools/treegen.py` builds six tree models procedurally (maple, bigleaf maple, columnar street tree, cherry, Douglas fir, western red cedar), each one mesh with one texture: a bark-textured trunk with real branches and a crown of alpha-cut leaf cards that shades as one mass and sways in the wind. `tools/trees.py detect` finds individual crowns in USGS NAIP leaf-on imagery (near-infrared vegetation index at 0.6 m), keeping vegetation that Snohomish County's LiDAR canopy layer shows as tall, or that stands over pavement: 14,533 crowns in `data/dossier/trees_raw.json`. A crown that is dark green in the county's leaf-off aerial of March 2024 is an evergreen. `tools/streets.py` takes the crowns standing over a street and plants them at the kerb or on the median (1,695); `tools/trees.py` places the other 12,590 where they stand. Species within evergreen and broadleaf is chosen by crown size: there is no public tree inventory to take it from.
+
+`tools/gshot.py OUT.png "x,y,up,tx,ty,tup"` takes stills from the running game in headless Chrome, at any map position and hour.
+
+Rebuild order: `tools/treegen.py`, `tools/street_data.py`, `tools/trees.py detect`, `tools/citygen.py . data/city.glb quant`, `tools/trees.py`.
+
+### Wetmore Ave
+
+Wetmore is done end to end (23rd St to 37th St) from five dossiers (`wetmore_n`, `wetmore_c1`, `wetmore_c2`, `wetmore_s1`, `wetmore_s2`): 220 footprints, 99 of them not houses.
+
+- Downtown (26th St to Pacific Ave): 37 buildings set by hand in `tools/blocks.py` with measured heights, roofs from the aerials, storefronts on street sides and blank party walls.
+- Outside downtown: 34 apartment and office buildings whose aerial shows a pitched shingle roof are now house-form (gabled, siding) instead of flat-roofed blocks.
+- Parking is as painted in the county aerial (`PARKING` in `tools/blocks.py`): 45 degree stalls on the east side from 26th St to Hewitt and on the west side from Hewitt to Pacific, parallel on the other side, with the centre line and the traffic lanes moved off-centre to match.
+- Public and listed buildings take their materials from written references: the National Register forms for the 1929 City Hall (3002) and the 1921 Knights of Columbus building (1611 Everett Ave), the Everett Register nomination for the Bank of Everett of 1963 (2730), Historic Everett's walking tour for the Port Gardner Building (2802), and the Hewitt district nomination for the IOOF Hall (2813).
+- Not verified: 2721 Wetmore is newer than the LiDAR survey, so its 44 ft is estimated from its shadow. Wall materials of the unlisted buildings are inferred. The Performing Arts Center, Municipal Building and Municipal Court have no written description of their walls in these sources.
+
+### Houses
+
+`tools/houses.py` reads every house and outbuilding roof (4,966 footprints) from the county 2024 aerial into `data/dossier/houses.json`, and `tools/citygen.py` builds the houses from it:
+
+| Read | How | Result |
+|---|---|---|
+| Shingle colour | Median roof pixel with tree canopy left out, matched to nine roofing colours | Mostly grey, 935 dark grey, 743 light grey, 359 brown |
+| Ridge direction | The two roof planes differ in brightness across the ridge | 1,078 ridges run across the short side |
+| Gable or hip | On a hip the planes' difference fades at the ends of the ridge | 2,993 gables and 731 hips read; 1,242 unclear and given a default |
+| Street side | Nearest street | Front door there |
+| Era | County recent-sales layer: exact year for 297 houses, nearest sold house within 150 m for 3,243 | A front porch on houses from before about 1950 |
+
+Gable ends are sided up to the ridge. Heights are the LiDAR ones from the whole-map pass.
+
+`tools/trees.py` now also sets the ground from the leaf-on imagery: grass where it shows vegetation, paved or bare ground where it does not, so lawns, driveways and car parks sit where the real ones are.
+
+Not from data: siding colours (an aerial cannot see walls), window layout, the porch design, and the era of the 3,243 houses that takes its year from a neighbour.
